@@ -2,7 +2,7 @@
 
 Time tracking, review and client invoicing for freelancers and small teams. Log time in 15-minute steps, approve or waive it, preview each client's bill, and send invoices from one dashboard.
 
-React 19 + TypeScript + Vite + Tailwind CSS v4 + Redux Toolkit. The Rust API lives in a separate repo (`taskx-backend`).
+React 19 + TypeScript + Vite + Tailwind CSS v4 + Redux Toolkit. The Rust API is in `../taskx-backend`.
 
 ## Run it
 
@@ -33,7 +33,11 @@ To move browser data to the server:
 2. Set `VITE_API_URL` and restart.
 3. Go to **Settings → Import backup**.
 
-In API mode, writes are sent one at a time in order. If the server rejects a change, its message is shown as a toast.
+In API mode:
+
+- If the server has accounts on, the app shows a sign-in screen first (`features/auth/AuthGate.tsx`). The token is kept in browser storage and sent as `Authorization: Bearer …`. A `401` returns to sign-in.
+- Writes are sent one at a time, in order. The top bar shows Saving…, Saved, Not saved or Offline.
+- If the server rejects a change, its message is shown and the app reloads from the server, so the screen never shows something that wasn't saved.
 
 ### API contract the backend must implement
 
@@ -46,6 +50,10 @@ In API mode, writes are sent one at a time in order. If the server rejects a cha
 | PUT | `/api/workspace` | workspace | workspace |
 | POST | `/api/import` | `{ workspace, clients, … }` | same, as saved |
 | POST | `/api/screenshots?user=&client=&project=&takenAt=` | image bytes | `{ path }` |
+| GET | `/api/activity?limit=&before=` | — | change log, newest first |
+| POST | `/api/auth/signup`, `/api/auth/login` | `{ email, password, … }` | `{ token, user }` |
+| GET | `/api/auth/me` | — | `{ authRequired, user }` |
+| POST | `/api/auth/logout`, `/api/auth/password` | — / `{ current, next }` | 204 |
 
 `collection` is one of `clients`, `projects`, `tasks`, `invoices` or `expenses`. The shapes are defined in `src/types/domain.ts`, and that file is the source of truth for the database tables. A few rules for the backend:
 
@@ -59,12 +67,15 @@ In API mode, writes are sent one at a time in order. If the server rejects a cha
 src/
   types/domain.ts         Domain model (mirrors the API / DB)
   domain/                 Pure logic, no React: billing math, insights, invoice export, journal parser (+ tests)
-  data/gateway.ts         LocalGateway (browser) / HttpGateway (Rust API)
+  data/gateway.ts         LocalGateway (browser) / HttpGateway (Rust API), apiRequest
+  data/session.ts         Sign-in token and the signed-in account
   data/sample.ts          Demo workspace
-  store/                  Redux: data + ui slices, sync middleware, thunks in operations.ts
+  store/                  Redux: data + ui slices, sync middleware, thunks in operations.ts,
+                          save status (syncStatus.ts), local change log (activity.ts)
+  lib/theme.ts            System / Light / Dark theme
   components/ui/          Design-system primitives: Modal, Toaster, TimeWheel, Pill, StatGrid, Menu…
   components/layout/      App shell, sidebar, top bar, command palette
-  features/               Dialogs and widgets by area (tasks, billing, invoices, clients)
+  features/               Dialogs and widgets by area (auth, tasks, billing, invoices, clients)
   pages/                  One file per route
   styles/index.css        Design tokens + component classes
 ```
@@ -112,12 +123,11 @@ All colors, fonts, radii, shadows and motion live as tokens in `src/styles/index
   | `N` | New task |
   | `T` | Start or stop the timer |
   | `⌘K` / `Ctrl+K` | Search and jump |
-  | `G` then `H` / `T` / `W` / `B` / `I` / `R` / `C` | Go to a page |
+  | `G` then `H` / `T` / `W` / `B` / `I` / `R` / `C` / `A` | Go to a page |
   | `?` | List of shortcuts |
 
 ## Not yet (needs the backend)
 
-- Sign-in and real user accounts.
 - Sending email from the server, with a PDF attached.
 - Online payments (Stripe).
 - Multi-device sync.
