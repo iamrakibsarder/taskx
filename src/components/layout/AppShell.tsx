@@ -1,11 +1,16 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
-  Camera, CameraOff, CalendarRange, ChartColumn, Command, FileText, House, ListChecks, Play, Plus, Search, Settings, Sparkles, Square,
-  Timer, Users, Wallet, X,
+  Camera, CameraOff, CalendarRange, ChartColumn, Check, ChevronsUpDown, CloudOff, Command, Ellipsis, FileText, History, House, ListChecks,
+  LoaderCircle, LogOut, Monitor, Moon, Play, Plus, Search, Settings, Sparkles, Square, Sun, Timer, TriangleAlert, Users, Wallet, X,
 } from 'lucide-react';
 import { useAppSelector, useData } from '@/store';
-import { ClientAvatar } from '@/components/ui';
+import { ClientAvatar, Menu, type MenuItem } from '@/components/ui';
+import { useAccount } from '@/data/session';
+import { gateway } from '@/data/gateway';
+import { signOut } from '@/features/auth/AuthGate';
+import { useSyncStatus } from '@/store/syncStatus';
+import { setTheme, useTheme, type ThemePref } from '@/lib/theme';
 import { useModal, Dialog } from '@/components/ui/Modal';
 import { CommandPalette, type PaletteAction } from './CommandPalette';
 import { clock, useElapsed, useGlobalActions } from '@/features/global';
@@ -23,7 +28,135 @@ const NAV = [
   { to: '/invoices', label: 'Invoices', icon: FileText, key: 'i' },
   { to: '/reports', label: 'Reports', icon: ChartColumn, key: 'r' },
   { to: '/clients', label: 'Clients', icon: Users, key: 'c' },
+  { to: '/activity', label: 'Activity', icon: History, key: 'a' },
 ] as const;
+
+const THEMES: Array<{ value: ThemePref; label: string; icon: typeof Sun }> = [
+  { value: 'system', label: 'System theme', icon: Monitor },
+  { value: 'light', label: 'Light theme', icon: Sun },
+  { value: 'dark', label: 'Dark theme', icon: Moon },
+];
+
+/** Theme choices plus sign out, shared by the sidebar account menu and the mobile sheet. */
+function useAccountItems(): MenuItem[] {
+  const theme = useTheme();
+  const account = useAccount();
+  const items: MenuItem[] = THEMES.map((t) => ({
+    label: t.label,
+    icon: theme === t.value ? <Check /> : <t.icon />,
+    onSelect: () => setTheme(t.value),
+  }));
+  if (account) items.push({ label: 'Sign out', icon: <LogOut />, onSelect: () => void signOut(), danger: true });
+  return items;
+}
+
+function AccountBox() {
+  const s = useData();
+  const account = useAccount();
+  const items = useAccountItems();
+  const name = account?.name || s.workspace.ownerName || 'You';
+  return (
+    <Menu
+      side="top"
+      align="left"
+      items={items}
+      trigger={(open, toggle) => (
+        <button
+          type="button"
+          onClick={toggle}
+          aria-expanded={open}
+          className="mt-2 flex w-[220px] items-center gap-2.5 rounded-lg border border-line px-2.5 py-2 text-left transition hover:bg-surface-2"
+        >
+          <span className="grid size-7 flex-none place-items-center rounded-full bg-night text-[11px] font-semibold text-white">
+            {initials(name || s.workspace.businessName || 'Me')}
+          </span>
+          <span className="min-w-0 flex-1 leading-tight">
+            <span className="block truncate text-[13px] font-medium">{name}</span>
+            <span className="block truncate text-[11.5px] text-faint">{account?.email || s.workspace.businessName}</span>
+          </span>
+          <ChevronsUpDown className="size-4 flex-none text-faint" />
+        </button>
+      )}
+    />
+  );
+}
+
+/** API mode: Saving… / Saved / Not saved, so a refused or lost write is never silent. */
+function SyncBadge() {
+  const st = useSyncStatus();
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (!st.savedAt) return;
+    const t = setTimeout(() => tick((n) => n + 1), 2600);
+    return () => clearTimeout(t);
+  }, [st.savedAt]);
+  if (gateway.kind !== 'http') return null;
+  const base = 'hidden h-8 items-center gap-1.5 rounded-md px-2 text-[12.5px] sm:flex';
+  if (st.pending > 0)
+    return (
+      <span className={cn(base, 'text-faint')} aria-live="polite">
+        <LoaderCircle className="size-3.5 animate-spin" /> Saving…
+      </span>
+    );
+  if (st.offline)
+    return (
+      <span className={cn(base, 'text-danger')} title={st.error ?? ''}>
+        <CloudOff className="size-3.5" /> Offline
+      </span>
+    );
+  if (st.error)
+    return (
+      <span className={cn(base, 'text-danger')} title={st.error}>
+        <TriangleAlert className="size-3.5" /> Not saved
+      </span>
+    );
+  if (st.savedAt && Date.now() - st.savedAt < 2500)
+    return (
+      <span className={cn(base, 'text-invoiced')}>
+        <Check className="size-3.5" /> Saved
+      </span>
+    );
+  return null;
+}
+
+const MOBILE_MAIN = ['/', '/tasks', '/timesheet', '/invoices'];
+
+function MoreSheet({ onClose }: { onClose: () => void }) {
+  const items = useAccountItems();
+  const extra = NAV.filter((n) => !MOBILE_MAIN.includes(n.to));
+  return (
+    <Dialog title="More" onClose={onClose}>
+      <div className="grid grid-cols-3 gap-2">
+        {[...extra, { to: '/settings', label: 'Settings', icon: Settings, key: '' }].map(({ to, label, icon: Icon }) => (
+          <NavLink
+            key={to}
+            to={to}
+            onClick={onClose}
+            className={({ isActive }) =>
+              cn('flex flex-col items-center gap-1.5 rounded-lg border border-line py-3 text-[12.5px] font-medium text-muted', isActive && 'border-brand-200 bg-brand-50 text-brand-700')
+            }
+          >
+            <Icon className="size-5" strokeWidth={1.9} />
+            {label}
+          </NavLink>
+        ))}
+      </div>
+      <div className="flex flex-col border-t border-line pt-3">
+        {items.map((it) => (
+          <button
+            key={it.label}
+            type="button"
+            onClick={() => (it.onSelect(), onClose())}
+            className={cn('flex items-center gap-3 rounded-md px-2 py-2.5 text-[14px] text-ink-2 [&_svg]:size-4 [&_svg]:text-faint', it.danger && 'text-danger [&_svg]:text-danger')}
+          >
+            {it.icon}
+            {it.label}
+          </button>
+        ))}
+      </div>
+    </Dialog>
+  );
+}
 
 function Logo() {
   return (
@@ -97,15 +230,7 @@ function Sidebar() {
         >
           <Settings className="size-[18px]" strokeWidth={1.9} /> Settings
         </NavLink>
-        <div className="mt-2 flex items-center gap-2.5 rounded-lg border border-line px-2.5 py-2">
-          <span className="grid size-7 flex-none place-items-center rounded-full bg-ink text-[11px] font-semibold text-white">
-            {initials(s.workspace.ownerName || s.workspace.businessName || 'Me')}
-          </span>
-          <div className="min-w-0 leading-tight">
-            <div className="truncate text-[13px] font-medium">{s.workspace.ownerName || 'You'}</div>
-            <div className="truncate text-[11.5px] text-faint">{s.workspace.businessName}</div>
-          </div>
-        </div>
+        <AccountBox />
       </div>
     </aside>
   );
@@ -167,7 +292,7 @@ function TimerWidget() {
 function ShortcutsDialog({ onClose }: { onClose: () => void }) {
   const rows: Array<[string, string]> = [
     ['N', 'New task'], ['T', 'Start or stop the timer'], ['⌘ K', 'Search and jump'], ['G then H', 'Home'], ['G then T', 'Tasks'],
-    ['G then W', 'Timesheet'], ['G then B', 'Billing'], ['G then I', 'Invoices'], ['G then R', 'Reports'], ['G then C', 'Clients'], ['?', 'This list'],
+    ['G then W', 'Timesheet'], ['G then B', 'Billing'], ['G then I', 'Invoices'], ['G then R', 'Reports'], ['G then C', 'Clients'], ['G then A', 'Activity'], ['?', 'This list'],
   ];
   return (
     <Dialog title="Keyboard shortcuts" onClose={onClose}>
@@ -245,6 +370,7 @@ export function AppShell() {
             <span className="flex-1 text-left max-sm:hidden">Search or jump to…</span>
             <span className="kbd max-sm:hidden"><Command className="inline size-2.5" /> K</span>
           </button>
+          <SyncBadge />
           <TimerWidget />
           <button type="button" className="btn btn-primary max-sm:w-9 max-sm:px-0" onClick={() => newTask()} title="New task (N)">
             <Plus /> <span className="max-sm:hidden">New task</span>
@@ -260,7 +386,7 @@ export function AppShell() {
         aria-label="Main"
         className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden"
       >
-        {NAV.filter((n) => ['/', '/tasks', '/timesheet', '/billing', '/invoices'].includes(n.to)).map(({ to, label, icon: Icon }) => (
+        {NAV.filter((n) => MOBILE_MAIN.includes(n.to)).map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
@@ -271,6 +397,17 @@ export function AppShell() {
             {label}
           </NavLink>
         ))}
+        <button
+          type="button"
+          onClick={() => modal.open((c) => <MoreSheet onClose={c} />)}
+          className={cn(
+            'flex h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-faint',
+            !MOBILE_MAIN.includes(loc.pathname) && !loc.pathname.startsWith('/invoices/') && 'text-brand-700',
+          )}
+        >
+          <Ellipsis className="size-5" strokeWidth={1.9} />
+          More
+        </button>
       </nav>
     </div>
   );

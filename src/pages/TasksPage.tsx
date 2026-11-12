@@ -171,7 +171,7 @@ export default function TasksPage() {
                 onClick={() => setParam('status', st === 'all' ? '' : st)}
                 className={cn(
                   'flex h-8 flex-none items-center gap-1.5 rounded-full px-3 text-[13px] font-medium text-muted transition hover:bg-surface-3 hover:text-ink',
-                  status === st && 'bg-ink text-white hover:bg-ink hover:text-white',
+                  status === st && 'bg-night text-white hover:bg-night hover:text-white',
                 )}
               >
                 {st === 'all' ? 'All' : st[0]!.toUpperCase() + st.slice(1)}
@@ -232,7 +232,7 @@ export default function TasksPage() {
       )}
 
       {selIds.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 z-30 flex -translate-x-1/2 animate-pop items-center gap-1 rounded-xl bg-ink py-1.5 pr-1.5 pl-4 text-white shadow-pop max-md:bottom-20">
+        <div className="fixed bottom-6 left-1/2 z-30 flex -translate-x-1/2 animate-pop items-center gap-1 rounded-xl bg-night py-1.5 pr-1.5 pl-4 text-white shadow-pop max-md:bottom-20">
           <span className="mr-2 text-[13px] whitespace-nowrap">
             {selIds.length} selected · <span className="num">{fmtH(sumMinutes(selTasks))}</span>
           </span>

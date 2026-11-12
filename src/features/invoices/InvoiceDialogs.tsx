@@ -4,8 +4,7 @@ import type { Invoice } from '@/types/domain';
 import { Dialog } from '@/components/ui/Modal';
 import { Field } from '@/components/ui';
 import { useAppDispatch, useData } from '@/store';
-import { patch } from '@/store/dataSlice';
-import { addCreditNote, markSent } from '@/store/operations';
+import { addCreditNote, markSent, recordPayment } from '@/store/operations';
 import { invoiceTotals } from '@/domain/billing';
 import { invoiceEmail, invoiceHtml } from '@/domain/invoiceExport';
 import { money, num, todayISO } from '@/lib/format';
@@ -65,35 +64,65 @@ export function SendDialog({ inv, onClose }: { inv: Invoice; onClose: () => void
   );
 }
 
+const METHODS = ['Bank transfer', 'Card', 'Cash', 'Cheque', 'PayPal', 'Other'];
+
 export function PaymentDialog({ inv, onClose }: { inv: Invoice; onClose: () => void }) {
   const dispatch = useAppDispatch();
   const t = invoiceTotals(inv);
+  const [amount, setAmount] = useState(String(t.balance));
   const [date, setDate] = useState(todayISO());
+  const [method, setMethod] = useState(METHODS[0]!);
   const [note, setNote] = useState('');
+  const amt = num(amount);
+  const left = Math.max(0, Math.round((t.balance - amt) * 100) / 100);
   return (
     <Dialog
       title="Record payment"
       onClose={onClose}
       onSubmit={() => {
-        dispatch(patch('invoices', inv.id, { status: 'paid', paidAt: date, paidNote: note.trim() || null }));
-        toast(`${inv.number} paid`);
-        onClose();
+        if (dispatch(recordPayment(inv.id, { amount: amt, date, method, note }))) onClose();
       }}
       footer={
         <>
           <button type="button" className="btn" onClick={onClose}>Cancel</button>
-          <button type="submit" className="btn btn-primary">Mark paid · {money(t.balance, inv.currency)}</button>
+          <button type="submit" className="btn btn-primary" disabled={!(amt > 0) || amt > t.balance + 0.005}>
+            Record {money(amt, inv.currency)}
+          </button>
         </>
       }
     >
+      <p className="text-[13.5px] text-muted">
+        {money(t.balance, inv.currency)} due on {inv.number}
+        {t.paid > 0 && <> · {money(t.paid, inv.currency)} already paid</>}.
+      </p>
       <div className="grid grid-cols-2 gap-3">
+        <Field
+          label="Amount"
+          hint={amt > t.balance + 0.005 ? <span className="text-danger">More than what’s due</span> : amt > 0 ? (left > 0 ? `${money(left, inv.currency)} left to pay` : 'Marks the invoice paid') : undefined}
+        >
+          <input type="number" min="0" step="0.01" max={t.balance} className="input num" value={amount} onChange={(e) => setAmount(e.target.value)} data-autofocus />
+        </Field>
         <Field label="Paid on">
           <input type="date" className="input" value={date} onChange={(e) => setDate(e.target.value)} />
         </Field>
-        <Field label="Note">
-          <input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Bank transfer, ref…" />
+        <Field label="Method">
+          <select className="input" value={method} onChange={(e) => setMethod(e.target.value)}>
+            {METHODS.map((m) => <option key={m}>{m}</option>)}
+          </select>
+        </Field>
+        <Field label="Reference">
+          <input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional" />
         </Field>
       </div>
+      {t.balance > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {[0.25, 0.5, 1].map((f) => (
+            <button key={f} type="button" className="chip border border-line" onClick={() => setAmount(String(Math.round(t.balance * f * 100) / 100))}>
+              {f === 1 ? 'Full balance' : `${f * 100}%`}
+            </button>
+          ))}
+        </div>
+      )}
     </Dialog>
   );
 }

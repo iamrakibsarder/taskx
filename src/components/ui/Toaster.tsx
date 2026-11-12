@@ -9,7 +9,7 @@ export function Toaster() {
       setItems((xs) => [...xs.slice(-2), t]);
       setTimeout(() => setItems((xs) => xs.filter((x) => x.id !== t.id)), 3000);
     });
-    const onSync = (e: Event) => toast.error(`Couldn't save to the server: ${(e as CustomEvent).detail}`);
+    const onSync = (e: Event) => toast.error(`Not saved: ${(e as CustomEvent).detail}`);
     window.addEventListener('taskx:sync-error', onSync);
     return () => {
       off();
@@ -24,7 +24,7 @@ export function Toaster() {
       {items.map((t) => (
         <div
           key={t.id}
-          className={cn('animate-pop rounded-lg px-4 py-2.5 text-[13.5px] text-white shadow-pop', t.tone === 'error' ? 'bg-danger' : 'bg-ink')}
+          className={cn('animate-pop rounded-lg px-4 py-2.5 text-[13.5px] text-white shadow-pop', t.tone === 'error' ? 'bg-[#e5484d]' : 'bg-night')}
         >
           {t.text}
         </div>

@@ -184,7 +184,9 @@ export interface MenuItem {
   onSelect: () => void;
   danger?: boolean;
 }
-export function Menu({ trigger, items, align = 'right' }: { trigger: (open: boolean, toggle: () => void) => ReactNode; items: MenuItem[]; align?: 'left' | 'right' }) {
+export function Menu({ trigger, items, align = 'right', side = 'bottom' }: {
+  trigger: (open: boolean, toggle: () => void) => ReactNode; items: MenuItem[]; align?: 'left' | 'right'; side?: 'top' | 'bottom';
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -205,7 +207,8 @@ export function Menu({ trigger, items, align = 'right' }: { trigger: (open: bool
         <div
           role="menu"
           className={cn(
-            'absolute top-[calc(100%+6px)] z-40 flex min-w-[210px] animate-pop flex-col rounded-lg border border-line bg-surface p-1 shadow-pop',
+            'absolute z-40 flex min-w-[210px] animate-pop flex-col rounded-lg border border-line bg-surface p-1 shadow-pop',
+            side === 'bottom' ? 'top-[calc(100%+6px)]' : 'bottom-[calc(100%+6px)]',
             align === 'right' ? 'right-0' : 'left-0',
           )}
         >

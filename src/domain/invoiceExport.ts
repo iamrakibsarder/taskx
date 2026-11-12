@@ -18,7 +18,9 @@ export function invoiceHtml(s: DataState, inv: Invoice): string {
       <td class="n">${l.minutes ? fmtH(l.minutes) : '—'}</td><td class="n">${l.kind === 'hours' || l.kind === 'overage' ? `${m(l.rate)}/h` : '—'}</td><td class="n">${m(l.amount)}</td></tr>`,
     )
     .join('');
-  const credits = (inv.credits ?? []).map((c) => `<span>Credit note ${esc(c.number)}</span><span class="n">−${m(c.amount)}</span>`).join('');
+  const credits =
+    (inv.credits ?? []).map((c) => `<span>Credit note ${esc(c.number)}</span><span class="n">−${m(c.amount)}</span>`).join('') +
+    (inv.payments ?? []).map((p) => `<span>Paid ${longDate(p.date)}</span><span class="n">−${m(p.amount)}</span>`).join('');
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Invoice ${esc(inv.number)}</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -67,12 +69,12 @@ export function invoiceEmail(s: DataState, inv: Invoice) {
   const t = invoiceTotals(inv);
   const f = inv.from ?? s.workspace;
   const m = (n: number) => money(n, inv.currency);
-  const due = t.credited ? t.balance : t.total;
+  const due = t.credited || t.paid ? t.balance : t.total;
   const subject = `Invoice ${inv.number} from ${f.businessName || 'us'}: ${m(due)} due ${longDate(inv.dueDate)}`;
   const body = [
     `Hi ${inv.client.contact || inv.client.name},`,
     '',
-    `Here is invoice ${inv.number} for ${monthLabel(inv.period)}. The ${t.credited ? 'balance' : 'total'} is ${m(due)}, due by ${longDate(inv.dueDate)}.`,
+    `Here is invoice ${inv.number} for ${monthLabel(inv.period)}. The ${t.credited || t.paid ? 'balance' : 'total'} is ${m(due)}, due by ${longDate(inv.dueDate)}.`,
     '',
     ...inv.lines.map((l) => `- ${l.desc}${l.minutes ? ` (${fmtH(l.minutes)} h)` : ''}: ${m(l.amount)}`),
     ...(t.discount ? [`- Discount: -${m(t.discount)}`] : []),

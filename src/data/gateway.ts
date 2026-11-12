@@ -1,6 +1,7 @@
-import type { CollectionKey, DataState, EntityOf, ID, Workspace } from '@/types/domain';
+import type { ActivityEntry, CollectionKey, DataState, EntityOf, ID, Workspace } from '@/types/domain';
 import { storage } from '@/lib/utils';
 import { defaultWorkspace, sampleData } from './sample';
+import { session, SIGNED_OUT } from './session';
 
 /**
  * The one seam between the UI and wherever data lives.
@@ -23,6 +24,45 @@ export interface DataGateway {
   reset?(): Promise<DataState>;
   /** Replace all data (restore a backup). */
   importAll(data: DataState): Promise<DataState>;
+  /** Change history, newest first. `before` = only entries older than that id. */
+  activity(before?: number): Promise<ActivityEntry[]>;
+  /** Resolves when every write sent so far has finished. */
+  idle(): Promise<void>;
+}
+
+/** Browser-mode change history, recorded by the store (see `store/activity.ts`). */
+export const LOCAL_ACTIVITY_KEY = 'taskx.activity.v1';
+
+/** Thrown for API errors; `status` 0 = the server couldn't be reached. */
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+  }
+}
+
+/** One request to the TaskX API, with the sign-in token. A 401 signs the person out. */
+export async function apiRequest<T>(base: string, method: string, path: string, body?: unknown): Promise<T> {
+  const headers: Record<string, string> = {};
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  const token = session.token();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let res: Response;
+  try {
+    res = await fetch(`${base.replace(/\/$/, '')}${path}`, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      credentials: 'include',
+    });
+  } catch {
+    throw new ApiError('Can’t reach the TaskX server. Check your connection.', 0);
+  }
+  if (!res.ok) {
+    const msg = ((await res.json().catch(() => null)) as { error?: string } | null)?.error;
+    if (res.status === 401 && !path.startsWith('/api/auth/')) window.dispatchEvent(new Event(SIGNED_OUT));
+    throw new ApiError(msg ?? `${method} ${path} failed with ${res.status}`, res.status);
+  }
+  return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
 }
 
 const KEY = 'taskx.data.v1';
@@ -54,6 +94,11 @@ export class LocalGateway implements DataGateway {
     storage.set(KEY, next);
     return next;
   }
+  async activity(before?: number) {
+    const all = storage.get<ActivityEntry[]>(LOCAL_ACTIVITY_KEY) ?? [];
+    return all.filter((e) => before === undefined || e.id < before).slice(0, 100);
+  }
+  async idle() {}
 }
 
 /** REST contract for the Rust API. Paths are relative to `VITE_API_URL`. */
@@ -63,18 +108,16 @@ export class HttpGateway implements DataGateway {
   /** Writes go out one at a time, in order, so e.g. "create invoice, then link tasks" never races. */
   private queue: Promise<unknown> = Promise.resolve();
 
-  private async send<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const res = await fetch(`${this.base.replace(/\/$/, '')}${path}`, {
-      method,
-      headers: body ? { 'Content-Type': 'application/json' } : undefined,
-      body: body ? JSON.stringify(body) : undefined,
-      credentials: 'include',
-    });
-    if (!res.ok) {
-      const msg = ((await res.json().catch(() => null)) as { error?: string } | null)?.error;
-      throw new Error(msg ?? `${method} ${path} failed with ${res.status}`);
-    }
-    return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
+  private send<T>(method: string, path: string, body?: unknown): Promise<T> {
+    return apiRequest<T>(this.base, method, path, body);
+  }
+
+  idle() {
+    return this.queue.then(() => undefined);
+  }
+  /** GET /api/activity */
+  activity(before?: number) {
+    return this.req<ActivityEntry[]>('GET', `/api/activity?limit=100${before ? `&before=${before}` : ''}`);
   }
 
   private req<T>(method: string, path: string, body?: unknown): Promise<T> {

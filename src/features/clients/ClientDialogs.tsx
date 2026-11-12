@@ -67,7 +67,7 @@ export function ClientDialog({ client, onClose }: { client?: Client; onClose: ()
           }}
         >
           <ClientAvatar client={{ name: f.name || '?', color: f.color, logo: f.logo }} size={64} />
-          <span className="absolute inset-0 grid place-items-center rounded-[10px] bg-ink/45 text-white opacity-0 transition group-hover:opacity-100">
+          <span className="absolute inset-0 grid place-items-center rounded-[10px] bg-black/45 text-white opacity-0 transition group-hover:opacity-100">
             <ImagePlus className="size-5" />
           </span>
           <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="sr-only" onChange={(e) => {

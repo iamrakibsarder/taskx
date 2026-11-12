@@ -1,8 +1,8 @@
 import type { ThunkAction, UnknownAction } from '@reduxjs/toolkit';
 import type { RootState } from './index';
 import { dataActions, patch, remove, upsert } from './dataSlice';
-import type { Client, CreditNote, DataState, Expense, ID, Invoice, ISODate, ISOMonth, Project, Task, TaskStatus } from '@/types/domain';
-import { addDays, fmtH, monthLabel, num, round2, snap15, todayISO } from '@/lib/format';
+import type { Client, CreditNote, DataState, Expense, ID, Invoice, ISODate, ISOMonth, Payment, Project, Task, TaskStatus } from '@/types/domain';
+import { addDays, fmtH, money, monthLabel, num, round2, snap15, todayISO } from '@/lib/format';
 import { uid } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 import {
@@ -261,6 +261,47 @@ export const addCreditNote =
     if (round2(t.balance - amt) <= 0 && inv.status !== 'paid') Object.assign(fields, { status: 'paid', paidAt: date, paidNote: 'Settled by credit note' });
     dispatch(patch('invoices', id, fields));
     toast(`Credit note ${credit.number} issued`);
+  };
+
+/** Records money received. When nothing is left to pay, the invoice becomes paid. */
+export const recordPayment =
+  (id: ID, p: { amount: number; date: ISODate; method: string; note: string }): Thunk<boolean> =>
+  (dispatch, getState) => {
+    const inv = D(getState).invoices.find((i) => i.id === id);
+    if (!inv) return false;
+    if (inv.status === 'draft' || inv.status === 'void') return toast.error('Send the invoice before recording payments.'), false;
+    const t = invoiceTotals(inv);
+    const amount = round2(p.amount);
+    if (!(amount > 0)) return toast.error('Enter an amount above zero.'), false;
+    if (amount > t.balance + 0.005) return toast.error(`That’s more than the ${money(t.balance, inv.currency)} still due.`), false;
+    const pay: Payment = { id: uid(), date: p.date, amount, method: p.method.trim(), note: p.note.trim() };
+    const fields: Partial<Invoice> = { payments: [...(inv.payments ?? []), pay] };
+    const left = round2(t.balance - amount);
+    if (left <= 0) Object.assign(fields, { status: 'paid', paidAt: p.date, paidNote: [pay.method, pay.note].filter(Boolean).join(' · ') || null });
+    dispatch(patch('invoices', id, fields));
+    toast(left <= 0 ? `${inv.number} paid in full` : `Payment recorded. ${money(left, inv.currency)} still due.`);
+    return true;
+  };
+
+/** Removes one payment; a paid invoice that now has money due goes back to sent. */
+export const removePayment =
+  (id: ID, paymentId: ID): Thunk =>
+  (dispatch, getState) => {
+    const inv = D(getState).invoices.find((i) => i.id === id);
+    if (!inv) return;
+    const payments = (inv.payments ?? []).filter((p) => p.id !== paymentId);
+    const fields: Partial<Invoice> = { payments };
+    if (inv.status === 'paid' && invoiceTotals({ ...inv, payments }).balance > 0) Object.assign(fields, { status: 'sent', paidAt: null, paidNote: null });
+    dispatch(patch('invoices', id, fields));
+    toast('Payment removed');
+  };
+
+/** Back to unpaid: clears recorded payments too, so the balance is right. */
+export const markUnpaid =
+  (id: ID): Thunk =>
+  (dispatch) => {
+    dispatch(patch('invoices', id, { status: 'sent', paidAt: null, paidNote: null, payments: [] }));
+    toast('Marked unpaid');
   };
 
 export const voidInvoice =

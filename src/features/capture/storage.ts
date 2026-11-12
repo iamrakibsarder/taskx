@@ -1,6 +1,7 @@
 import { apiUrl } from '@/data/gateway';
 import { idb } from '@/lib/idb';
 import { localStamp, screenshotPath, type ShotContext } from './paths';
+import { session } from '@/data/session';
 
 /**
  * Where screenshots are written. Same idea as the data gateway:
@@ -67,7 +68,10 @@ class ServerStorage implements ScreenshotStorage {
     const q = new URLSearchParams({ user: ctx.user, client: ctx.client, project: ctx.project, takenAt: localStamp(at) });
     const res = await fetch(`${this.base.replace(/\/$/, '')}/api/screenshots?${q}`, {
       method: 'POST',
-      headers: { 'Content-Type': image.type || 'image/jpeg' },
+      headers: {
+        'Content-Type': image.type || 'image/jpeg',
+        ...(session.token() ? { Authorization: `Bearer ${session.token()}` } : {}),
+      },
       body: image,
       credentials: 'include',
     });

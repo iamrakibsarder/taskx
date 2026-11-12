@@ -116,6 +116,16 @@ export interface CreditNote {
   reason: string;
 }
 
+/** Money received against an invoice. Several partial payments can add up to the total. */
+export interface Payment {
+  id: ID;
+  date: ISODate;
+  amount: number;
+  /** Bank transfer, card, cash… */
+  method: string;
+  note: string;
+}
+
 export interface PartySnapshot {
   name: string;
   contact: string;
@@ -154,6 +164,7 @@ export interface Invoice {
   paidAt?: ISODate | null;
   paidNote?: string | null;
   credits?: CreditNote[];
+  payments?: Payment[];
   createdAt: number;
   sample?: boolean;
 }
@@ -193,3 +204,15 @@ export interface DataState {
 
 export type CollectionKey = 'clients' | 'projects' | 'tasks' | 'invoices' | 'expenses';
 export type EntityOf<K extends CollectionKey> = DataState[K][number];
+
+/** One line of the change history. */
+export interface ActivityEntry {
+  id: number;
+  /** ISO timestamp. */
+  at: string;
+  actor: string;
+  action: 'create' | 'update' | 'delete' | 'import' | 'settings';
+  entity: string;
+  entityId: string;
+  summary: string;
+}

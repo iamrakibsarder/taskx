@@ -1,9 +1,12 @@
-import { useState, type ReactNode } from 'react';
-import { Download, FolderOpen, Upload, Lock, Plus, RotateCcw, Trash2, X } from 'lucide-react';
+import { useState, type FormEvent, type ReactNode } from 'react';
+import { Download, FolderOpen, KeyRound, LogOut, Monitor, Moon, Sun, Upload, Lock, Plus, RotateCcw, Trash2, X } from 'lucide-react';
+import { setTheme, useTheme } from '@/lib/theme';
+import { useAccount } from '@/data/session';
+import { authApi, signOut } from '@/features/auth/AuthGate';
 import type { DataState, RoundingMode, Workspace } from '@/types/domain';
 import { Field, PageHeader, Segmented } from '@/components/ui';
 import { Confirm, useModal } from '@/components/ui/Modal';
-import { importData, resetToSample, store, useAppDispatch, useData } from '@/store';
+import { importData, loadSampleIntoServer, resetToSample, store, useAppDispatch, useData } from '@/store';
 import { dataActions } from '@/store/dataSlice';
 import { clearSampleData } from '@/store/operations';
 import { gateway } from '@/data/gateway';
@@ -68,7 +71,41 @@ function Toggle({ checked, onChange, label, hint }: { checked: boolean; onChange
   );
 }
 
+function PasswordForm() {
+  const [f, setF] = useState({ current: '', next: '' });
+  const [busy, setBusy] = useState(false);
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (f.next.length < 8) return toast.error('Use a new password of at least 8 characters.');
+    setBusy(true);
+    try {
+      await authApi.changePassword(f.current, f.next);
+      setF({ current: '', next: '' });
+      toast('Password changed. Other devices were signed out.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <form onSubmit={submit} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+      <Field label="Current password">
+        <input type="password" className="input" autoComplete="current-password" value={f.current} onChange={(e) => setF({ ...f, current: e.target.value })} />
+      </Field>
+      <Field label="New password">
+        <input type="password" className="input" autoComplete="new-password" value={f.next} onChange={(e) => setF({ ...f, next: e.target.value })} />
+      </Field>
+      <button type="submit" className="btn" disabled={busy || !f.current || !f.next}>
+        <KeyRound /> Change
+      </button>
+    </form>
+  );
+}
+
 export default function SettingsPage() {
+  const theme = useTheme();
+  const account = useAccount();
   const s = useData();
   const dispatch = useAppDispatch();
   const modal = useModal();
@@ -147,7 +184,7 @@ export default function SettingsPage() {
           {w.screenshotMinutes > 0 && <ScreenshotFolder />}
         </Section>
 
-        <Section title="Team" sub="Track who logged each task. No accounts yet, just names.">
+        <Section title="Team" sub="Track who logged each task by name.">
           <Toggle checked={w.team} onChange={(team) => set({ team })} label="Show who logged time" />
           {w.team && (
             <div className="flex flex-col gap-2">
@@ -177,6 +214,28 @@ export default function SettingsPage() {
             </div>
           )}
         </Section>
+
+        <Section title="Appearance" sub="Follow your device, or always use light or dark.">
+          <Segmented
+            label="Theme"
+            value={theme}
+            onChange={setTheme}
+            options={[
+              { value: 'system', label: <><Monitor /> System</> },
+              { value: 'light', label: <><Sun /> Light</> },
+              { value: 'dark', label: <><Moon /> Dark</> },
+            ]}
+          />
+        </Section>
+
+        {account && (
+          <Section title="Account" sub={`Signed in as ${account.email}.`}>
+            <PasswordForm />
+            <button type="button" className="btn self-start" onClick={() => void signOut()}>
+              <LogOut /> Sign out
+            </button>
+          </Section>
+        )}
 
         <Section title="Locked months" sub="Locked months can’t be edited. Approving, waiving and invoicing still work.">
           <div className="flex flex-wrap items-center gap-3">
@@ -251,6 +310,19 @@ export default function SettingsPage() {
                 <Trash2 /> Clear sample data
               </button>
             )}
+            {!gateway.reset && !s.clients.length && !s.tasks.length && (
+              <button
+                type="button"
+                className="btn"
+                onClick={() =>
+                  void loadSampleIntoServer()
+                    .then(() => toast('Sample data added. Clear it any time from here.'))
+                    .catch((err: unknown) => toast.error(err instanceof Error ? err.message : String(err)))
+                }
+              >
+                <RotateCcw /> Load sample data
+              </button>
+            )}
             {gateway.reset && (
               <button
                 type="button"
@@ -269,7 +341,7 @@ export default function SettingsPage() {
         </Section>
       </div>
       {dirty && (
-        <div className="sticky bottom-6 z-10 flex animate-pop items-center justify-between gap-3 self-center rounded-xl bg-ink py-2 pr-2 pl-4 text-white shadow-pop max-md:bottom-20">
+        <div className="sticky bottom-6 z-10 flex animate-pop items-center justify-between gap-3 self-center rounded-xl bg-night py-2 pr-2 pl-4 text-white shadow-pop max-md:bottom-20">
           <span className="text-[13px]">Unsaved changes</span>
           <button type="button" className="btn btn-sm border-white/10 bg-white/10 text-white shadow-none hover:bg-white/20" onClick={() => setW(s.workspace)}>Discard</button>
           <button type="button" className="btn btn-primary btn-sm" onClick={save}>Save</button>

@@ -82,7 +82,7 @@ export default function InvoicesPage() {
                     <td><Pill status={st} /></td>
                     <td className="n pr-5">
                       <div className={cn('text-[13.5px] font-medium', st === 'void' && 'text-faint line-through')}>{money(t.total, i.currency)}</div>
-                      {t.credited > 0 && st !== 'paid' && <div className="text-[11.5px] text-faint">{money(t.balance, i.currency)} due</div>}
+                      {(t.credited > 0 || t.paid > 0) && st !== 'paid' && <div className="text-[11.5px] text-faint">{money(t.balance, i.currency)} due</div>}
                     </td>
                   </tr>
                 );

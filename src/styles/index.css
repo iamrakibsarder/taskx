@@ -30,6 +30,9 @@
   --color-ink-2: #2d2638;
   --color-muted: #5c5c63;
   --color-faint: #9a96a5;
+  /* Dark "inverse" surfaces (toasts, floating bars) that stay dark in both themes */
+  --color-night: #0c021a;
+  --color-night-2: #241a33;
 
   /* Brand */
   --color-brand-50: #f6f0ff;
@@ -87,9 +90,95 @@
 
 :root {
   /* Non-utility tokens */
-  --brand-gradient: linear-gradient(135deg, var(--color-brand-700) 0%, var(--color-brand-500) 100%);
+  /* Fixed colors, so white text on brand buttons reads the same in both themes */
+  --brand-gradient: linear-gradient(135deg, #6a0be4 0%, #9747fe 100%);
   --ring: 0 0 0 3px rgb(151 71 254 / 0.22);
   color-scheme: light;
+}
+
+/*
+ * Dark theme. `data-theme="dark"` forces it; with no attribute the system setting decides;
+ * `data-theme="light"` forces light. The same token overrides are used in both places.
+ */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --color-canvas: #0e0b14;
+  --color-surface: #16121e;
+  --color-surface-2: #1c1726;
+  --color-surface-3: #262031;
+  --color-line: #29233a;
+  --color-line-2: #3a3349;
+  --color-ink: #f3f0f9;
+  --color-ink-2: #d9d4e4;
+  --color-muted: #aaa5b8;
+  --color-faint: #7a748c;
+  --color-night: #2a2338;
+  --color-night-2: #352d46;
+  --color-brand-50: #211534;
+  --color-brand-100: #2c1c48;
+  --color-brand-200: #45296f;
+  --color-brand-300: #6c47aa;
+  --color-brand-400: #8e5fe6;
+  --color-brand-500: #a26cff;
+  --color-brand-600: #b282ff;
+  --color-brand-700: #c29dff;
+  --color-brand-800: #d6bfff;
+  --color-review: #e8b440;
+  --color-review-bg: #2e2510;
+  --color-billable: #c29dff;
+  --color-billable-bg: #241838;
+  --color-invoiced: #3ccb8e;
+  --color-invoiced-bg: #0f2a1f;
+  --color-waived: #a39eb0;
+  --color-waived-bg: #221f2a;
+  --color-internal: #43c4d6;
+  --color-internal-bg: #0e272c;
+  --color-danger: #ff6b70;
+  --color-danger-bg: #3a1618;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-pop: 0 24px 56px -18px rgb(0 0 0 / 0.7), 0 2px 8px rgb(0 0 0 / 0.4);
+  --shadow-brand: 0 6px 14px -4px rgb(141 62 244 / 0.35);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --color-canvas: #0e0b14;
+    --color-surface: #16121e;
+    --color-surface-2: #1c1726;
+    --color-surface-3: #262031;
+    --color-line: #29233a;
+    --color-line-2: #3a3349;
+    --color-ink: #f3f0f9;
+    --color-ink-2: #d9d4e4;
+    --color-muted: #aaa5b8;
+    --color-faint: #7a748c;
+    --color-night: #2a2338;
+    --color-night-2: #352d46;
+    --color-brand-50: #211534;
+    --color-brand-100: #2c1c48;
+    --color-brand-200: #45296f;
+    --color-brand-300: #6c47aa;
+    --color-brand-400: #8e5fe6;
+    --color-brand-500: #a26cff;
+    --color-brand-600: #b282ff;
+    --color-brand-700: #c29dff;
+    --color-brand-800: #d6bfff;
+    --color-review: #e8b440;
+    --color-review-bg: #2e2510;
+    --color-billable: #c29dff;
+    --color-billable-bg: #241838;
+    --color-invoiced: #3ccb8e;
+    --color-invoiced-bg: #0f2a1f;
+    --color-waived: #a39eb0;
+    --color-waived-bg: #221f2a;
+    --color-internal: #43c4d6;
+    --color-internal-bg: #0e272c;
+    --color-danger: #ff6b70;
+    --color-danger-bg: #3a1618;
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3);
+    --shadow-pop: 0 24px 56px -18px rgb(0 0 0 / 0.7), 0 2px 8px rgb(0 0 0 / 0.4);
+    --shadow-brand: 0 6px 14px -4px rgb(141 62 244 / 0.35);
+  }
 }
 
 @layer base {
@@ -119,18 +208,18 @@
     box-shadow: var(--shadow-card);
     transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.1s;
   }
-  .btn:hover { border-color: var(--color-line-2); background: #fcfbfe; }
+  .btn:hover { border-color: var(--color-line-2); background: color-mix(in srgb, var(--color-surface) 60%, var(--color-surface-2)); }
   .btn:active { transform: scale(0.98); }
   .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
   .btn svg { width: 16px; height: 16px; flex: none; }
   .btn-primary { background: var(--brand-gradient); border-color: transparent; color: #fff; box-shadow: var(--shadow-brand); }
   .btn-primary:hover { background: var(--brand-gradient); filter: brightness(1.06); }
-  .btn-dark { background: var(--color-ink); border-color: var(--color-ink); color: #fff; }
-  .btn-dark:hover { background: #241a33; }
+  .btn-dark { background: var(--color-night); border-color: var(--color-night); color: #fff; }
+  .btn-dark:hover { background: var(--color-night-2); }
   .btn-ghost { border-color: transparent; background: transparent; box-shadow: none; }
-  .btn-ghost:hover { background: rgb(12 2 26 / 0.04); border-color: transparent; }
-  .btn-danger { color: var(--color-danger); border-color: #f6cfd0; }
-  .btn-danger:hover { background: var(--color-danger-bg); border-color: #f6cfd0; }
+  .btn-ghost:hover { background: color-mix(in srgb, var(--color-ink) 5%, transparent); border-color: transparent; }
+  .btn-danger { color: var(--color-danger); border-color: color-mix(in srgb, var(--color-danger) 30%, transparent); }
+  .btn-danger:hover { background: var(--color-danger-bg); border-color: color-mix(in srgb, var(--color-danger) 30%, transparent); }
   .btn-soft { background: var(--color-brand-50); color: var(--color-brand-700); border-color: transparent; box-shadow: none; }
   .btn-soft:hover { background: var(--color-brand-100); border-color: transparent; }
   .btn-sm { height: 1.85rem; padding: 0 0.65rem; font-size: 12.5px; border-radius: var(--radius-sm); }

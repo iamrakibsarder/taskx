@@ -48,17 +48,21 @@ export interface InvoiceTotals {
   tax: number;
   total: number;
   credited: number;
+  /** Sum of payments received. */
+  paid: number;
+  /** What's still owed: total minus credit notes and payments. */
   balance: number;
 }
 
-export function invoiceTotals(inv: Pick<Invoice, 'lines' | 'discount' | 'taxRate' | 'credits'>): InvoiceTotals {
+export function invoiceTotals(inv: Pick<Invoice, 'lines' | 'discount' | 'taxRate' | 'credits' | 'payments'>): InvoiceTotals {
   const subtotal = round2(sumBy(inv.lines, (l) => num(l.amount)));
   const discount = round2(num(inv.discount));
   const taxable = Math.max(0, subtotal - discount);
   const tax = round2((taxable * num(inv.taxRate)) / 100);
   const total = round2(taxable + tax);
   const credited = round2(sumBy(inv.credits ?? [], (c) => num(c.amount)));
-  return { subtotal, discount, tax, total, credited, balance: round2(Math.max(0, total - credited)) };
+  const paid = round2(sumBy(inv.payments ?? [], (p) => num(p.amount)));
+  return { subtotal, discount, tax, total, credited, paid, balance: round2(Math.max(0, total - credited - paid)) };
 }
 
 export function invoiceStatus(inv: Invoice, today = todayISO()): InvoiceDisplayStatus {

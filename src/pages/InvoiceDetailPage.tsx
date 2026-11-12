@@ -2,11 +2,11 @@ import { useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Ban, CreditCard, Download, Ellipsis, FileText, Pencil, Plus, Send, TicketMinus, Trash2, Undo2, X } from 'lucide-react';
 import type { Invoice, InvoiceLine } from '@/types/domain';
-import { Card, Empty, Field, Menu, Pill, type MenuItem } from '@/components/ui';
+import { Card, Empty, Field, Menu, Pill, Progress, type MenuItem } from '@/components/ui';
 import { Confirm, useModal } from '@/components/ui/Modal';
 import { useAppDispatch, useData } from '@/store';
 import { patch } from '@/store/dataSlice';
-import { voidInvoice } from '@/store/operations';
+import { markUnpaid, removePayment, voidInvoice } from '@/store/operations';
 import { CreditDialog, PaymentDialog, SendDialog, saveInvoiceHtml } from '@/features/invoices/InvoiceDialogs';
 import { clientIdOf, invoiceStatus, invoiceTotals, sumMinutes } from '@/domain/billing';
 import { invoiceTimesheetCsv } from '@/domain/invoiceExport';
@@ -76,7 +76,8 @@ function Paper({ inv }: { inv: Invoice }) {
         <div className="my-1 h-px bg-line" />
         <Row label="Total" v={m(t.total)} strong />
         {(inv.credits ?? []).map((c) => <Row key={c.id} label={`Credit ${c.number}`} v={`−${m(c.amount)}`} />)}
-        {t.credited > 0 && <Row label="Balance due" v={m(t.balance)} strong />}
+        {(inv.payments ?? []).map((p) => <Row key={p.id} label={`Paid ${longDate(p.date)}`} v={`−${m(p.amount)}`} />)}
+        {(t.credited > 0 || t.paid > 0) && <Row label="Balance due" v={m(t.balance)} strong />}
       </div>
       {(inv.notes || from.paymentInfo) && (
         <div className="mt-10 grid gap-6 border-t border-line pt-6 text-[12.5px] text-muted sm:grid-cols-2">
@@ -186,7 +187,22 @@ export default function InvoiceDetailPage() {
   if (st !== 'draft' && st !== 'void') more.push({ label: 'Resend', icon: <Send />, onSelect: () => open((c) => <SendDialog inv={inv} onClose={c} />) });
   if ((st === 'sent' || st === 'overdue' || st === 'paid') && t.balance > 0)
     more.push({ label: 'Credit note', icon: <TicketMinus />, onSelect: () => open((c) => <CreditDialog inv={inv} onClose={c} />) });
-  if (st === 'paid') more.push({ label: 'Mark unpaid', icon: <Undo2 />, onSelect: () => (dispatch(patch('invoices', inv.id, { status: 'sent', paidAt: null, paidNote: null })), toast('Marked unpaid')) });
+  if (st === 'paid')
+    more.push({
+      label: 'Mark unpaid', icon: <Undo2 />,
+      onSelect: () =>
+        (inv.payments?.length ?? 0) > 0
+          ? open((c) => (
+              <Confirm
+                title={`Mark ${inv.number} unpaid?`}
+                body={`This removes its ${inv.payments!.length} recorded payment${inv.payments!.length === 1 ? '' : 's'}.`}
+                confirm="Mark unpaid"
+                onClose={c}
+                onConfirm={() => dispatch(markUnpaid(inv.id))}
+              />
+            ))
+          : dispatch(markUnpaid(inv.id)),
+    });
   if (st !== 'void')
     more.push({
       label: st === 'draft' ? 'Delete draft' : 'Void invoice', icon: st === 'draft' ? <Trash2 /> : <Ban />, danger: true,
@@ -223,8 +239,14 @@ export default function InvoiceDetailPage() {
         <div className="min-w-0">{editing && st === 'draft' ? <DraftEditor inv={inv} onDone={() => setEditing(false)} /> : <Paper inv={inv} />}</div>
         <aside className="flex flex-col gap-4">
           <Card>
-            <div className="text-[12.5px] text-muted">{st === 'paid' ? 'Paid' : t.credited ? 'Balance due' : 'Amount due'}</div>
+            <div className="text-[12.5px] text-muted">{st === 'paid' ? 'Paid' : t.credited || t.paid ? 'Balance due' : 'Amount due'}</div>
             <div className={cn('num text-[28px] font-medium', st === 'overdue' && 'text-danger')}>{money(st === 'paid' ? t.total : t.balance, inv.currency)}</div>
+            {t.paid > 0 && st !== 'paid' && (
+              <div className="mt-3 flex flex-col gap-1.5">
+                <Progress value={t.paid + t.credited} max={t.total} />
+                <span className="text-[12px] text-faint">{money(t.paid, inv.currency)} of {money(t.total, inv.currency)} paid</span>
+              </div>
+            )}
             <dl className="mt-4 flex flex-col gap-2 text-[13px]">
               <Meta k="Client" v={<Link className="hover:text-brand-700" to={`/tasks?client=${inv.clientId}`}>{inv.client.name}</Link>} />
               <Meta k="Sent" v={inv.sentAt ? longDate(inv.sentAt) : '—'} />
@@ -241,6 +263,37 @@ export default function InvoiceDetailPage() {
               </button>
             </div>
           </Card>
+          {(inv.payments?.length ?? 0) > 0 && (
+            <Card title="Payments">
+              <ul className="flex flex-col gap-2.5 text-[13px]">
+                {inv.payments!.map((p) => (
+                  <li key={p.id} className="group flex items-center justify-between gap-3">
+                    <span className="min-w-0">
+                      <span className="block font-medium">{longDate(p.date)}</span>
+                      <span className="block truncate text-[12px] text-faint">{[p.method, p.note].filter(Boolean).join(' · ') || 'Payment'}</span>
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="num">{money(p.amount, inv.currency)}</span>
+                      {st !== 'void' && (
+                        <button
+                          type="button"
+                          className="btn-icon opacity-0 group-hover:opacity-100 focus:opacity-100 max-md:opacity-100"
+                          aria-label="Remove payment"
+                          onClick={() =>
+                            open((c) => (
+                              <Confirm title="Remove this payment?" body={`${money(p.amount, inv.currency)} on ${longDate(p.date)}.`} confirm="Remove" danger onClose={c} onConfirm={() => dispatch(removePayment(inv.id, p.id))} />
+                            ))
+                          }
+                        >
+                          <X />
+                        </button>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
           {(inv.credits?.length ?? 0) > 0 && (
             <Card title="Credit notes">
               <div className="flex flex-col gap-2 text-[13px]">
