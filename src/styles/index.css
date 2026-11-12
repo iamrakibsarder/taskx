@@ -191,6 +191,10 @@
     cursor: pointer;
   }
   button:disabled, [aria-disabled='true'] { cursor: not-allowed; }
+  /* One look for every checkbox, and no browser spin arrows inside number fields. */
+  input[type='checkbox'], input[type='radio'] { accent-color: var(--color-brand-600); }
+  input[type='number']::-webkit-inner-spin-button, input[type='number']::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type='number'] { -moz-appearance: textfield; appearance: textfield; }
   body {
     background: var(--color-canvas);
     color: var(--color-ink);

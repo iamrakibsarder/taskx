@@ -60,7 +60,7 @@ function Toggle({ checked, onChange, label, hint }: { checked: boolean; onChange
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className="relative mt-0.5 h-5 w-9 flex-none rounded-full bg-line-2 transition aria-checked:bg-brand-600"
+        className="relative h-5 w-9 flex-none rounded-full bg-line-2 transition aria-checked:bg-brand-600"
       >
         <span className={`absolute top-0.5 left-0.5 size-4 rounded-full bg-white shadow transition ${checked ? 'translate-x-4' : ''}`} />
       </button>

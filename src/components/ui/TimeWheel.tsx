@@ -74,14 +74,14 @@ export function TimeWheel({ minutes, onChange, maxHours = 12 }: { minutes: numbe
         <Column values={quarters} index={q} onIndex={(i) => set(h, i)} label="Minutes" format={(v) => String(v).padStart(2, '0')} />
         <span className="relative ml-1.5 text-[11.5px] text-faint">hrs</span>
       </div>
-      <div className="flex max-w-[230px] flex-wrap justify-center gap-1.5">
+      <div className="flex flex-wrap justify-center gap-1 sm:flex-nowrap">
         {PRESETS.map((m) => (
           <button
             key={m}
             type="button"
             onClick={() => onChange(m)}
             className={cn(
-              'rounded-full border px-2.5 py-0.5 font-mono text-[12px] transition',
+              'rounded-full border px-2 py-0.5 font-mono text-[11.5px] transition',
               m === minutes ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-line text-ink-2 hover:border-ink',
             )}
           >

@@ -53,17 +53,21 @@ export interface Stat {
 }
 export function StatGrid({ stats }: { stats: Stat[] }) {
   return (
-    <div
-      className="grid overflow-hidden rounded-lg border border-line bg-line shadow-card"
-      style={{ gap: 1, gridTemplateColumns: `repeat(auto-fit, minmax(${stats.length > 3 ? 150 : 180}px, 1fr))` }}
-    >
-      {stats.map((s) => (
-        <div key={s.label} className="flex min-w-0 flex-col gap-1 bg-surface px-5 py-4">
-          <span className="truncate text-[12.5px] font-medium text-muted">{s.label}</span>
-          <span className={cn('num truncate text-[24px] font-medium md:text-[26px]', s.tone === 'danger' && 'text-danger')}>{s.value}</span>
-          {s.hint && <span className="truncate text-[12px] text-faint">{s.hint}</span>}
-        </div>
-      ))}
+    <div className="overflow-hidden rounded-lg border border-line bg-surface shadow-card">
+      {/* Each tile draws its right and bottom divider; the grid is 1px wider and taller than the
+          card so the outer ones hide under its edge, and a leftover empty cell is plain card. */}
+      <div
+        className="-mr-px -mb-px grid"
+        style={{ gridTemplateColumns: `repeat(auto-fit, minmax(${stats.length > 3 ? 150 : 180}px, 1fr))` }}
+      >
+        {stats.map((s) => (
+          <div key={s.label} className="flex min-w-0 flex-col gap-1 border-r border-b border-line px-5 py-4">
+            <span className="truncate text-[12.5px] font-medium text-muted">{s.label}</span>
+            <span className={cn('num truncate text-[24px] font-medium md:text-[26px]', s.tone === 'danger' && 'text-danger')}>{s.value}</span>
+            {s.hint && <span className="truncate text-[12px] text-faint">{s.hint}</span>}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

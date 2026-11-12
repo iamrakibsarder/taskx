@@ -64,30 +64,28 @@ export function TaskDialog({ task, prefill, onClose, onSaved }: { task?: Task; p
           <Field label="Project">
             <ProjectSelect value={f.projectId} onChange={(projectId) => set({ projectId })} includeId={task?.projectId} />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Date">
-              <input type="date" className="input" value={f.date} onChange={(e) => set({ date: e.target.value })} />
+          <Field label="Date">
+            <input type="date" className="input" value={f.date} onChange={(e) => set({ date: e.target.value })} />
+          </Field>
+          {s.workspace.team ? (
+            <Field label="By">
+              <select className="input" value={f.by} onChange={(e) => set({ by: e.target.value })}>
+                {people.map((p) => <option key={p}>{p}</option>)}
+              </select>
             </Field>
-            {s.workspace.team ? (
-              <Field label="By">
-                <select className="input" value={f.by} onChange={(e) => set({ by: e.target.value })}>
-                  {people.map((p) => <option key={p}>{p}</option>)}
-                </select>
-              </Field>
-            ) : (
-              <Field label="Link">
-                <input className="input" value={f.link} onChange={(e) => set({ link: e.target.value })} placeholder="Optional" />
-              </Field>
-            )}
-          </div>
+          ) : (
+            <Field label="Link">
+              <input className="input" value={f.link} onChange={(e) => set({ link: e.target.value })} placeholder="Optional" />
+            </Field>
+          )}
           {s.workspace.team && (
             <Field label="Link">
               <input className="input" value={f.link} onChange={(e) => set({ link: e.target.value })} placeholder="Optional" />
             </Field>
           )}
         </div>
-        <div className="flex flex-col items-center gap-1.5">
-          <span className="label self-start sm:self-center">Time</span>
+        <div className="flex flex-col gap-1.5">
+          <span className="label">Time</span>
           <TimeWheel minutes={f.minutes} onChange={(minutes) => set({ minutes })} maxHours={16} />
         </div>
       </div>

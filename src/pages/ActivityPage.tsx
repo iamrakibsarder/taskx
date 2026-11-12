@@ -22,6 +22,14 @@ const FILTERS: Array<{ value: Filter; label: string }> = [
 const ICON: Record<string, typeof ListChecks> = {
   task: ListChecks, invoice: FileText, client: Users, project: FolderKanban, expense: Receipt, workspace: Settings, account: UserRound,
 };
+/** "Emailed INV-0007 to x" and "Updated settings: …" instead of "Changed INV-0007 emailed to x". */
+function line(e: ActivityEntry): { verb: string; rest: string } {
+  const s = e.summary || e.entity;
+  if (/ emailed to /.test(s)) return { verb: 'Emailed', rest: s.replace(' emailed to ', ' to ') };
+  if (e.action === 'settings') return { verb: VERB.settings, rest: s === 'Settings updated' ? 'settings' : s.replace(/^Settings\b/, 'settings') };
+  return { verb: VERB[e.action], rest: s };
+}
+
 const VERB: Record<ActivityEntry['action'], string> = {
   create: 'Added', update: 'Changed', delete: 'Deleted', import: 'Imported', settings: 'Updated',
 };
@@ -121,8 +129,8 @@ export default function ActivityPage() {
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13.5px]">
-                        <span className={cn('font-medium', TONE[e.action])}>{VERB[e.action]}</span>{' '}
-                        <span className="text-ink-2">{e.summary || e.entity}</span>
+                        <span className={cn('font-medium', TONE[e.action])}>{line(e).verb}</span>{' '}
+                        <span className="text-ink-2">{line(e).rest}</span>
                       </span>
                       <span className="block text-[12px] text-faint">
                         {new Date(e.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
