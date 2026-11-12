@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { ArrowLeft, ArrowRight, Eye, EyeOff, LoaderCircle, MailCheck, RefreshCw, Users } from 'lucide-react';
 import { apiRequest, apiUrl, ApiError } from '@/data/gateway';
 import { session, SIGNED_OUT, type Account } from '@/data/session';
 import { teamApi, type InviteInfo } from '@/data/teamApi';
 import { bootstrap } from '@/store';
+
+// Clients open this without an account; it loads on its own.
+const ClientPortal = lazy(() => import('@/features/portal/ClientPortal'));
 
 /* ---------------- Auth API ---------------- */
 
@@ -36,10 +39,12 @@ const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 type GateState = 'checking' | 'signedOut' | 'ready' | 'unreachable';
 
-/** Pages that work before sign-in: `/reset-password?token=…` and `/invite/<token>`. */
-function publicPage(): { kind: 'reset'; token: string } | { kind: 'invite'; token: string } | null {
+/** Pages that work before sign-in: `/reset-password?token=…`, `/invite/<token>` and a client's `/portal/<token>`. */
+function publicPage(): { kind: 'reset' | 'invite' | 'portal'; token: string } | null {
   const { pathname, search } = window.location;
   if (pathname === '/reset-password') return { kind: 'reset', token: new URLSearchParams(search).get('token') ?? '' };
+  const portal = pathname.match(/^\/portal\/([^/]+)\/?$/);
+  if (portal) return { kind: 'portal', token: decodeURIComponent(portal[1]!) };
   const m = pathname.match(/^\/invite\/([^/]+)$/);
   return m ? { kind: 'invite', token: decodeURIComponent(m[1]!) } : null;
 }
@@ -84,6 +89,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   if (page?.kind === 'reset') return <ResetPassword token={page.token} />;
   if (page?.kind === 'invite') return <AcceptInvite token={page.token} />;
+  if (page?.kind === 'portal')
+    return (
+      <Suspense fallback={null}>
+        <ClientPortal token={page.token} />
+      </Suspense>
+    );
   if (state === 'ready') return <>{children}</>;
   if (state === 'signedOut')
     return (

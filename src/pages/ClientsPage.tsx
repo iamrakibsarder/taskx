@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Archive, Ellipsis, FolderKanban, Mail, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Archive, Ellipsis, FolderKanban, Globe, Mail, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { Client, Project } from '@/types/domain';
 import { ClientAvatar, Empty, Menu, PageHeader, Progress } from '@/components/ui';
 import { Confirm, useModal } from '@/components/ui/Modal';
 import { useAppDispatch, useData } from '@/store';
 import { deleteClient, deleteProject, saveProject } from '@/store/operations';
 import { ClientDialog, ProjectDialog } from '@/features/clients/ClientDialogs';
+import { PortalDialog } from '@/features/portal/PortalDialog';
+import { gateway } from '@/data/gateway';
 import { clientIdOf, projectUsedMinutes, sumMinutes } from '@/domain/billing';
 import { fmtH, money, num } from '@/lib/format';
 import { toast } from '@/lib/toast';
@@ -76,6 +78,7 @@ function ClientCard({ c }: { c: Client }) {
           items={[
             { label: 'Edit client', icon: <Pencil />, onSelect: () => modal.open((x) => <ClientDialog client={c} onClose={x} />) },
             { label: 'Add project', icon: <Plus />, onSelect: () => modal.open((x) => <ProjectDialog clientId={c.id} onClose={x} />) },
+            ...(gateway.kind === 'http' ? [{ label: 'Client portal', icon: <Globe />, onSelect: () => modal.open((x) => <PortalDialog client={c} onClose={x} />) }] : []),
             {
               label: 'Delete client', icon: <Trash2 />, danger: true,
               onSelect: () => modal.open((x) => <Confirm title={`Delete ${c.name}?`} body="Clients with logged time can’t be deleted. Make them inactive instead." confirm="Delete" danger onClose={x} onConfirm={() => dispatch(deleteClient(c.id)) && toast('Client deleted')} />),
