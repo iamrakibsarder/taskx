@@ -10,6 +10,7 @@ import { markUnpaid, removePayment, voidInvoice } from '@/store/operations';
 import { invoiceApi } from '@/data/invoiceApi';
 import { gateway } from '@/data/gateway';
 import { CreditDialog, PaymentDialog, SendDialog, saveInvoiceHtml } from '@/features/invoices/InvoiceDialogs';
+import { RemindersCard } from '@/features/invoices/Reminders';
 import { clientIdOf, invoiceStatus, invoiceTotals, sumMinutes } from '@/domain/billing';
 import { invoiceTimesheetCsv } from '@/domain/invoiceExport';
 import { fmtH, longDate, money, monthLabel, num, round2 } from '@/lib/format';
@@ -259,6 +260,7 @@ export default function InvoiceDetailPage() {
               {inv.paidNote && <Meta k="Note" v={inv.paidNote} />}
             </dl>
           </Card>
+          {gateway.kind === 'http' && st !== 'draft' && st !== 'void' && <RemindersCard inv={inv} />}
           <Card title="Work on this invoice">
             <div className="flex flex-col gap-2 text-[13px]">
               <Meta k="Tasks" v={`${tasks.length} · ${fmtH(sumMinutes(tasks))}`} />

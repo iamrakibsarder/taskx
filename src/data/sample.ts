@@ -22,6 +22,8 @@ export const defaultWorkspace = (): Workspace => ({
   rounding: 'nearest',
   lockedThrough: '',
   screenshotMinutes: 5,
+  remindersOn: false,
+  reminderDays: [-3, 0, 7, 14],
 });
 
 /** Example data shown on first run. Every record is marked `sample: true` so it can be cleared. */

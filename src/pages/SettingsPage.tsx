@@ -1,7 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { Download, FolderOpen, KeyRound, LogOut, Monitor, Moon, Sun, Upload, Lock, Plus, RotateCcw, Trash2, X } from 'lucide-react';
 import { setTheme, useTheme } from '@/lib/theme';
-import { can, useAccount } from '@/data/session';
+import { can, session, useAccount } from '@/data/session';
 import { authApi, signOut } from '@/features/auth/AuthGate';
 import type { DataState, RoundingMode, Workspace } from '@/types/domain';
 import { Field, PageHeader, Segmented } from '@/components/ui';
@@ -104,6 +104,46 @@ function PasswordForm() {
   );
 }
 
+const REMINDER_CHOICES = [-7, -3, -1, 0, 1, 3, 7, 14, 30];
+export const reminderLabel = (d: number) =>
+  d === 0 ? 'On the due date' : d < 0 ? `${-d} day${d === -1 ? '' : 's'} before` : `${d} day${d === 1 ? '' : 's'} late`;
+
+function RemindersSection({ w, set }: { w: Workspace; set: (p: Partial<Workspace>) => void }) {
+  const days = w.reminderDays ?? [];
+  const toggle = (d: number) =>
+    set({ reminderDays: days.includes(d) ? days.filter((x) => x !== d) : [...days, d].sort((a, b) => a - b) });
+  return (
+    <Section title="Payment reminders" sub="TaskX emails clients about unpaid invoices, with the invoice PDF attached. You can turn it off for a client in their details.">
+      <Toggle
+        checked={w.remindersOn}
+        onChange={(remindersOn) => set({ remindersOn, reminderDays: days.length ? days : [-3, 0, 7, 14] })}
+        label="Send payment reminders"
+        hint={session.mailEnabled() ? 'Only invoices that are sent and not fully paid.' : 'Email isn’t set up on the server yet, so nothing will be sent until it is.'}
+      />
+      {w.remindersOn && (
+        <div className="flex flex-col gap-2">
+          <span className="text-[13px] font-medium">Send one</span>
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Reminder days">
+            {REMINDER_CHOICES.map((d) => (
+              <button
+                key={d}
+                type="button"
+                aria-pressed={days.includes(d)}
+                onClick={() => toggle(d)}
+                className="chip border border-line bg-surface text-ink-2 aria-pressed:border-brand-600 aria-pressed:bg-brand-50 aria-pressed:text-brand-700"
+              >
+                {reminderLabel(d)}
+              </button>
+            ))}
+          </div>
+          {!days.length && <p className="text-[12.5px] text-danger">Pick at least one.</p>}
+          <p className="text-[12.5px] text-faint">Times are in UTC. A reminder more than 3 days past its date is skipped, so turning this on never sends a burst of old reminders.</p>
+        </div>
+      )}
+    </Section>
+  );
+}
+
 export default function SettingsPage() {
   const theme = useTheme();
   const account = useAccount();
@@ -115,6 +155,7 @@ export default function SettingsPage() {
   // Members see the workspace settings but only owners and admins change them.
   const admin = can(account, 'admin');
   const dirty = admin && JSON.stringify(w) !== JSON.stringify(s.workspace);
+  const invalid = w.remindersOn && !w.reminderDays?.length;
   const set = (p: Partial<Workspace>) => setW((x) => ({ ...x, ...p }));
   const save = () => {
     dispatch(dataActions.setWorkspace({ ...w, defaultRate: num(w.defaultRate), termsDays: num(w.termsDays), taxRate: num(w.taxRate), screenshotMinutes: num(w.screenshotMinutes) }));
@@ -130,7 +171,7 @@ export default function SettingsPage() {
         actions={dirty && (
           <>
             <button type="button" className="btn" onClick={() => setW(s.workspace)}>Discard</button>
-            <button type="button" className="btn btn-primary" onClick={save}>Save changes</button>
+            <button type="button" className="btn btn-primary" onClick={save} disabled={invalid}>Save changes</button>
           </>
         )}
       />
@@ -163,6 +204,8 @@ export default function SettingsPage() {
           <Field label="How to pay"><textarea className="input" rows={3} value={w.paymentInfo} onChange={(e) => set({ paymentInfo: e.target.value })} placeholder="Bank details, payment link…" /></Field>
           <Field label="Default note"><textarea className="input" rows={2} value={w.invoiceNote} onChange={(e) => set({ invoiceNote: e.target.value })} placeholder="Thank you for your business." /></Field>
         </Section>
+
+        {gateway.kind === 'http' && <RemindersSection w={w} set={set} />}
 
         <Section title="Time" sub="All time is kept in 15-minute steps.">
           <div className="flex flex-wrap items-center justify-between gap-3">

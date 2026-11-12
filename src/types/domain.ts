@@ -40,6 +40,10 @@ export interface Workspace {
   lockedThrough: ISOMonth | '';
   /** Minutes between timer screenshots. 0 = never ask to capture. */
   screenshotMinutes: number;
+  /** Email payment reminders for unpaid invoices (server with email only). */
+  remindersOn: boolean;
+  /** When reminders go out, in days from the due date: -3 = three days before, 7 = a week late. */
+  reminderDays: number[];
 }
 
 export interface Client {
@@ -59,6 +63,8 @@ export interface Client {
   /** Monthly hours cap. 0 = no cap. */
   cap: number;
   active: boolean;
+  /** Gets automatic payment reminders. Missing = yes. */
+  reminders?: boolean;
   createdAt: number;
   sample?: boolean;
 }

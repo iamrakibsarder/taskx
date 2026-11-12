@@ -6,6 +6,7 @@ import { ClientAvatar, Field, Segmented } from '@/components/ui';
 import { useAppDispatch, useData } from '@/store';
 import { saveClient, saveProject } from '@/store/operations';
 import { CLIENT_COLORS } from '@/data/sample';
+import { gateway } from '@/data/gateway';
 import { num } from '@/lib/format';
 import { toast } from '@/lib/toast';
 import { cn, uid } from '@/lib/utils';
@@ -135,6 +136,12 @@ export function ClientDialog({ client, onClose }: { client?: Client; onClose: ()
           <Field label="Hourly rate"><input type="number" min="0" className="input num" value={rate} onChange={(e) => setRate(e.target.value)} placeholder={`${s.workspace.defaultRate} (default)`} /></Field>
           <Field label="Monthly cap (hours)"><input type="number" min="0" className="input num" value={f.cap || ''} onChange={(e) => set({ cap: +e.target.value })} placeholder="No cap" /></Field>
         </div>
+      )}
+      {gateway.kind === 'http' && (
+        <label className="flex items-center gap-2.5 text-[13.5px]">
+          <input type="checkbox" className="size-4" checked={f.reminders !== false} onChange={(e) => set({ reminders: e.target.checked })} /> Send payment reminders
+          {!s.workspace.remindersOn && <span className="text-[12px] text-faint">(off in Settings)</span>}
+        </label>
       )}
       {client && (
         <label className="flex items-center gap-2.5 text-[13.5px]">
