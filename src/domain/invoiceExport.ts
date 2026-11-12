@@ -65,23 +65,34 @@ export function invoiceTimesheetCsv(s: DataState, inv: Invoice): string {
   return csv(rows);
 }
 
+/** Minutes of work billed on an invoice: hourly, retainer, overage and covered lines. */
+export const invoiceMinutes = (inv: Invoice) =>
+  inv.lines.filter((l) => l.kind !== 'expense' && l.kind !== 'custom').reduce((n, l) => n + (l.minutes || 0), 0);
+
+/** `6:45 (6.75 hours)`, or `6 hours` on the hour. */
+const hoursText = (min: number) =>
+  min % 60 ? `${fmtH(min)} (${round2(min / 60)} hours)` : `${min / 60} hour${min === 60 ? '' : 's'}`;
+
 export function invoiceEmail(s: DataState, inv: Invoice) {
   const t = invoiceTotals(inv);
   const f = inv.from ?? s.workspace;
   const m = (n: number) => money(n, inv.currency);
-  const due = t.credited || t.paid ? t.balance : t.total;
+  const settled = Boolean(t.credited || t.paid);
+  const due = settled ? t.balance : t.total;
+  const min = invoiceMinutes(inv);
   const subject = `Invoice ${inv.number} from ${f.businessName || 'us'}: ${m(due)} due ${longDate(inv.dueDate)}`;
   const body = [
     `Hi ${inv.client.contact || inv.client.name},`,
     '',
-    `Here is invoice ${inv.number} for ${monthLabel(inv.period)}. The ${t.credited || t.paid ? 'balance' : 'total'} is ${m(due)}, due by ${longDate(inv.dueDate)}.`,
+    `Please find attached invoice ${inv.number}${inv.period ? ` for ${monthLabel(inv.period)}` : ''}.`,
     '',
-    ...inv.lines.map((l) => `- ${l.desc}${l.minutes ? ` (${fmtH(l.minutes)} h)` : ''}: ${m(l.amount)}`),
-    ...(t.discount ? [`- Discount: -${m(t.discount)}`] : []),
-    ...(t.tax ? [`- ${inv.taxLabel}: ${m(t.tax)}`] : []),
+    ...(min ? [`Your total hours: ${hoursText(min)}`] : []),
+    `${settled ? 'Balance due' : 'Amount due'}: ${m(due)}, by ${longDate(inv.dueDate)}`,
+    '',
+    'See the attached invoice (PDF) for the full breakdown of the work and charges.',
     '',
     ...(f.paymentInfo ? ['How to pay:', f.paymentInfo, ''] : []),
-    'The full invoice is attached. Let me know if you have any questions.',
+    'Let me know if you have any questions.',
     '',
     'Thank you,',
     f.ownerName || f.businessName || '',

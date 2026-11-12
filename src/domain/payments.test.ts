@@ -83,3 +83,20 @@ describe('local activity log', () => {
     expect(entryFor(base, base, { type: 'data/remove', payload: { col: 'tasks', id: 'ghost' } }, '')).toBeNull();
   });
 });
+
+describe('invoice email', () => {
+  it('states the total hours and points to the attached PDF', async () => {
+    const { invoiceEmail } = await import('./invoiceExport');
+    const state: DataState = { workspace: defaultWorkspace(), clients: [], projects: [], tasks: [], invoices: [], expenses: [] };
+    const lines = [
+      { kind: 'hours' as const, desc: 'Work', detail: '', minutes: 315, rate: 50, amount: 262.5, taskIds: [] },
+      { kind: 'hours' as const, desc: 'More', detail: '', minutes: 90, rate: 50, amount: 75, taskIds: [] },
+      { kind: 'expense' as const, desc: 'Fonts', detail: '', minutes: 0, rate: 0, amount: 40, taskIds: [] },
+    ];
+    const { body } = invoiceEmail(state, inv({ lines }));
+    expect(body).toContain('Your total hours: 6:45 (6.75 hours)');
+    expect(body).toContain('See the attached invoice (PDF)');
+    const onlyExpenses = invoiceEmail(state, inv({ lines: [lines[2]!] })).body;
+    expect(onlyExpenses).not.toContain('total hours');
+  });
+});

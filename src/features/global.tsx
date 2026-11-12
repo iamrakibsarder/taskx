@@ -12,6 +12,7 @@ import { toast } from '@/lib/toast';
 import { findClient, findProject } from '@/domain/billing';
 import { isCaptureSupported, startCapture, stopCapture } from '@/features/capture/capture';
 import type { ShotContext } from '@/features/capture/paths';
+import { SCREENSHOTS } from '@/lib/flags';
 import { allowFolder, folderAccess, pickFolder, screenshotStorage } from '@/features/capture/storage';
 
 /** Seconds since the timer started, ticking. */
@@ -66,7 +67,7 @@ function StartTimerDialog({ onClose }: { onClose: () => void }) {
   const every = useAppSelector((s) => s.data.workspace.screenshotMinutes);
   const [projectId, setProjectId] = useState('');
   const [memo, setMemo] = useState('');
-  const canCapture = every > 0 && isCaptureSupported();
+  const canCapture = SCREENSHOTS && every > 0 && isCaptureSupported();
   const [capture, setCapture] = useState(canCapture);
   const folder = useScreenshotFolder();
   const folderOk = !folder.needsFolder || folder.access.state === 'granted';

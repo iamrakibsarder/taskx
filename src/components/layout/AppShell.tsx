@@ -17,6 +17,7 @@ import { useModal, Dialog } from '@/components/ui/Modal';
 import { CommandPalette, type PaletteAction } from './CommandPalette';
 import { clock, useElapsed, useGlobalActions } from '@/features/global';
 import { stopCapture, useCapture } from '@/features/capture/capture';
+import { SCREENSHOTS } from '@/lib/flags';
 import { JournalDialog } from '@/features/tasks/TaskDialogs';
 import { useProjectLabel } from '@/components/ProjectSelect';
 import { initials } from '@/lib/format';
@@ -310,7 +311,7 @@ function Sidebar() {
 function CaptureBadge() {
   const { timer, resumeCapture } = useGlobalActions();
   const cap = useCapture();
-  if (!timer?.capture) return null;
+  if (!SCREENSHOTS || !timer?.capture) return null;
   if (!cap.active)
     return (
       <button type="button" className="btn-icon text-warning" onClick={resumeCapture} title="Screenshots paused. Click to share your screen again.">

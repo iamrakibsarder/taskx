@@ -12,6 +12,7 @@ import { clearSampleData } from '@/store/operations';
 import { gateway } from '@/data/gateway';
 import { useScreenshotFolder } from '@/features/global';
 import { folderSupported } from '@/features/capture/storage';
+import { SCREENSHOTS } from '@/lib/flags';
 import { monthLabel, num } from '@/lib/format';
 import { toast } from '@/lib/toast';
 import { downloadFile } from '@/lib/utils';
@@ -176,6 +177,7 @@ export default function SettingsPage() {
           <Toggle checked={w.autoApprove} onChange={(autoApprove) => set({ autoApprove })} label="Skip review" hint="New client tasks go straight to approved. Good if you work alone." />
         </Section>
 
+        {SCREENSHOTS && (
         <Section title="Screenshots" sub="While the timer runs, TaskX can save a screenshot of the screen you share. You choose the screen each time.">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="text-[13.5px] font-medium">Take one every</span>
@@ -186,6 +188,7 @@ export default function SettingsPage() {
           </div>
           {w.screenshotMinutes > 0 && <ScreenshotFolder />}
         </Section>
+        )}
 
         <Section title="Team" sub="Track who logged each task by name.">
           <Toggle checked={w.team} onChange={(team) => set({ team })} label="Show who logged time" />
