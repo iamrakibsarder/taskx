@@ -183,6 +183,14 @@
 
 @layer base {
   html { background: var(--color-canvas); }
+  /* Tailwind 4 gives buttons the arrow cursor; everything clickable gets the hand. */
+  button:not(:disabled), [role='button'], [role='menuitem'], [role='option'], [role='tab'], [role='switch'],
+  a[href], summary, label:has(> input[type='checkbox']:not(:disabled), > input[type='radio']:not(:disabled)),
+  input[type='checkbox']:not(:disabled), input[type='radio']:not(:disabled), input[type='file'], input[type='color'],
+  input[type='date']::-webkit-calendar-picker-indicator, input[type='month']::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+  }
+  button:disabled, [aria-disabled='true'] { cursor: not-allowed; }
   body {
     background: var(--color-canvas);
     color: var(--color-ink);
