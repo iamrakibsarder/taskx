@@ -56,6 +56,7 @@ function track(write: Promise<void>) {
 }
 
 let resyncTimer: ReturnType<typeof setTimeout> | undefined;
+let lastLoad = Date.now();
 /** Reloads everything from the server after the write queue drains. */
 export function scheduleResync(delay = 400) {
   clearTimeout(resyncTimer);
@@ -66,6 +67,7 @@ export function scheduleResync(delay = 400) {
       // A write sent while loading may not be in `fresh`; try again once things settle.
       if (getSync().pending > 0) return scheduleResync();
       store.dispatch(dataActions.loaded(fresh));
+      lastLoad = Date.now();
       setSync({ error: null, offline: false });
     } catch (e) {
       setSync({ error: e instanceof Error ? e.message : String(e), offline: e instanceof ApiError && e.status === 0 });
@@ -76,6 +78,10 @@ export function scheduleResync(delay = 400) {
 if (typeof window !== 'undefined' && gateway.kind === 'http') {
   // Back online: show the server's version of things.
   window.addEventListener('online', () => getSync().offline && scheduleResync(0));
+  // Teammates change things too: coming back to the tab after a while picks up their work.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && Date.now() - lastLoad > 30_000) scheduleResync(0);
+  });
 }
 
 export const store = configureStore({

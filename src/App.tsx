@@ -13,6 +13,7 @@ const ReportsPage = lazy(() => import('@/pages/ReportsPage'));
 const ClientsPage = lazy(() => import('@/pages/ClientsPage'));
 const SettingsPage = lazy(() => import('@/pages/SettingsPage'));
 const ActivityPage = lazy(() => import('@/pages/ActivityPage'));
+const TeamPage = lazy(() => import('@/pages/TeamPage'));
 
 const wrap = (el: ReactNode) => <Suspense fallback={<div className="py-20 text-center text-faint">Loading…</div>}>{el}</Suspense>;
 
@@ -30,6 +31,7 @@ export default function App() {
         <Route path="clients" element={wrap(<ClientsPage />)} />
         <Route path="settings" element={wrap(<SettingsPage />)} />
         <Route path="activity" element={wrap(<ActivityPage />)} />
+        <Route path="team" element={wrap(<TeamPage />)} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

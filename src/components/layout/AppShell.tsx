@@ -2,11 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Camera, CameraOff, CalendarRange, ChartColumn, Check, ChevronsUpDown, CloudOff, Command, Ellipsis, FileText, History, House, ListChecks,
-  LoaderCircle, LogOut, Monitor, Moon, Play, Plus, Search, Settings, Sparkles, Square, Sun, Timer, TriangleAlert, Users, Wallet, X,
+  ArrowLeftRight, Building2, LoaderCircle, LogOut, Monitor, UserPlus, Moon, Play, Plus, Search, Settings, Sparkles, Square, Sun, Timer, TriangleAlert, Users, Wallet, X,
 } from 'lucide-react';
 import { useAppSelector, useData } from '@/store';
 import { ClientAvatar, Menu, type MenuItem } from '@/components/ui';
 import { useAccount } from '@/data/session';
+import { switchTo, teamApi, type WorkspaceSummary } from '@/data/teamApi';
+import { toast } from '@/lib/toast';
 import { gateway } from '@/data/gateway';
 import { signOut } from '@/features/auth/AuthGate';
 import { useSyncStatus } from '@/store/syncStatus';
@@ -31,6 +33,60 @@ const NAV = [
   { to: '/activity', label: 'Activity', icon: History, key: 'a' },
 ] as const;
 
+type NavItem = { to: string; label: string; icon: typeof House; key: string };
+const TEAM: NavItem = { to: '/team', label: 'Team', icon: UserPlus, key: 'm' };
+/** Team appears only when signed in to a server with accounts. */
+function useNav(): readonly NavItem[] {
+  const account = useAccount();
+  return account ? [...NAV, TEAM] : NAV;
+}
+
+/** The person's other workspaces, for the switcher (accounts mode only). */
+function useWorkspaces() {
+  const account = useAccount();
+  const [list, setList] = useState<WorkspaceSummary[]>([]);
+  useEffect(() => {
+    if (!account) return;
+    teamApi.workspaces().then(setList).catch(() => setList([]));
+  }, [account]);
+  return list;
+}
+
+function NewWorkspaceDialog({ onClose }: { onClose: () => void }) {
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    if (!name.trim()) return toast.error('Give the workspace a name.');
+    setBusy(true);
+    try {
+      await teamApi.createWorkspace(name.trim());
+      window.location.assign('/settings');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+      setBusy(false);
+    }
+  };
+  return (
+    <Dialog
+      title="New workspace"
+      onClose={onClose}
+      onSubmit={submit}
+      footer={
+        <>
+          <button type="button" className="btn" onClick={onClose}>Cancel</button>
+          <button type="submit" className="btn btn-primary" disabled={busy}>Create and switch</button>
+        </>
+      }
+    >
+      <label className="flex flex-col gap-1.5">
+        <span className="label">Business or team name</span>
+        <input className="input" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+      </label>
+      <p className="mt-3 text-[12.5px] text-muted">A separate set of clients, tasks and invoices. You’ll be its owner and can invite people from Team.</p>
+    </Dialog>
+  );
+}
+
 const THEMES: Array<{ value: ThemePref; label: string; icon: typeof Sun }> = [
   { value: 'system', label: 'System theme', icon: Monitor },
   { value: 'light', label: 'Light theme', icon: Sun },
@@ -41,11 +97,25 @@ const THEMES: Array<{ value: ThemePref; label: string; icon: typeof Sun }> = [
 function useAccountItems(): MenuItem[] {
   const theme = useTheme();
   const account = useAccount();
-  const items: MenuItem[] = THEMES.map((t) => ({
-    label: t.label,
-    icon: theme === t.value ? <Check /> : <t.icon />,
-    onSelect: () => setTheme(t.value),
-  }));
+  const workspaces = useWorkspaces();
+  const modal = useModal();
+  const items: MenuItem[] = [];
+  if (account) {
+    for (const w of workspaces.filter((w) => !w.current))
+      items.push({
+        label: `Switch to ${w.name}`,
+        icon: <ArrowLeftRight />,
+        onSelect: () => void switchTo(w.id).catch((e: unknown) => toast.error(e instanceof Error ? e.message : String(e))),
+      });
+    items.push({ label: 'New workspace', icon: <Building2 />, onSelect: () => modal.open((c) => <NewWorkspaceDialog onClose={c} />) });
+  }
+  items.push(
+    ...THEMES.map((t) => ({
+      label: t.label,
+      icon: theme === t.value ? <Check /> : <t.icon />,
+      onSelect: () => setTheme(t.value),
+    })),
+  );
   if (account) items.push({ label: 'Sign out', icon: <LogOut />, onSelect: () => void signOut(), danger: true });
   return items;
 }
@@ -72,7 +142,7 @@ function AccountBox() {
           </span>
           <span className="min-w-0 flex-1 leading-tight">
             <span className="block truncate text-[13px] font-medium">{name}</span>
-            <span className="block truncate text-[11.5px] text-faint">{account?.email || s.workspace.businessName}</span>
+            <span className="block truncate text-[11.5px] text-faint">{account ? account.workspaceName : s.workspace.businessName}</span>
           </span>
           <ChevronsUpDown className="size-4 flex-none text-faint" />
         </button>
@@ -123,7 +193,7 @@ const MOBILE_MAIN = ['/', '/tasks', '/timesheet', '/invoices'];
 
 function MoreSheet({ onClose }: { onClose: () => void }) {
   const items = useAccountItems();
-  const extra = NAV.filter((n) => !MOBILE_MAIN.includes(n.to));
+  const extra = useNav().filter((n) => !MOBILE_MAIN.includes(n.to));
   return (
     <Dialog title="More" onClose={onClose}>
       <div className="grid grid-cols-3 gap-2">
@@ -177,11 +247,12 @@ function Sidebar() {
   const clients = s.clients.filter((c) => c.active).sort((a, b) => a.name.localeCompare(b.name));
   const loc = useLocation();
   const activeClient = new URLSearchParams(loc.search).get('client');
+  const nav = useNav();
   return (
     <aside className="sticky top-0 hidden h-screen w-[244px] flex-none flex-col border-r border-line bg-surface px-3 pt-5 pb-4 md:flex">
       <div className="px-2.5 pb-6"><Logo /></div>
       <nav className="flex flex-col gap-0.5" aria-label="Main">
-        {NAV.map(({ to, label, icon: Icon }) => (
+        {nav.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
@@ -338,7 +409,7 @@ export function AppShell() {
       const k = e.key.toLowerCase();
       if (Date.now() - gPressed.current < 900) {
         gPressed.current = 0;
-        const hit = NAV.find((n) => n.key === k);
+        const hit = [...NAV, TEAM].find((n) => n.key === k);
         if (hit) (e.preventDefault(), nav(hit.to));
         return;
       }

@@ -7,23 +7,34 @@ export interface Account {
   email: string;
   name: string;
   workspaceId: string;
+  /** In the current workspace. */
+  role: Role;
+  workspaceName: string;
 }
+
+export type Role = 'owner' | 'admin' | 'member';
+const RANK: Record<Role, number> = { owner: 3, admin: 2, member: 1 };
+/** True when `role` is at least `min`. With no account (browser mode, accounts off) you can do everything. */
+export const can = (a: Account | null, min: Role) => !a || RANK[a.role] >= RANK[min];
 
 const TOKEN_KEY = 'taskx.token';
 let account: Account | null = null;
+/** The server really sends email (otherwise invite links must be shared by hand). */
+let mailEnabled = false;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
 
 export const session = {
   token: () => storage.get<string>(TOKEN_KEY),
-  /** Keeps the token for later visits and remembers who is signed in. */
-  signIn(token: string, user: Account) {
+  account: () => account,
+  mailEnabled: () => mailEnabled,
+  /** Keeps the token for later visits. Call `setAccount` with `/api/auth/me` afterwards. */
+  saveToken(token: string) {
     storage.set(TOKEN_KEY, token);
-    account = user;
-    emit();
   },
-  setAccount(user: Account | null) {
+  setAccount(user: Account | null, mail = false) {
     account = user;
+    mailEnabled = mail;
     emit();
   },
   clear() {

@@ -1,7 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { Download, FolderOpen, KeyRound, LogOut, Monitor, Moon, Sun, Upload, Lock, Plus, RotateCcw, Trash2, X } from 'lucide-react';
 import { setTheme, useTheme } from '@/lib/theme';
-import { useAccount } from '@/data/session';
+import { can, useAccount } from '@/data/session';
 import { authApi, signOut } from '@/features/auth/AuthGate';
 import type { DataState, RoundingMode, Workspace } from '@/types/domain';
 import { Field, PageHeader, Segmented } from '@/components/ui';
@@ -111,7 +111,9 @@ export default function SettingsPage() {
   const modal = useModal();
   const [w, setW] = useState<Workspace>(s.workspace);
   const [member, setMember] = useState('');
-  const dirty = JSON.stringify(w) !== JSON.stringify(s.workspace);
+  // Members see the workspace settings but only owners and admins change them.
+  const admin = can(account, 'admin');
+  const dirty = admin && JSON.stringify(w) !== JSON.stringify(s.workspace);
   const set = (p: Partial<Workspace>) => setW((x) => ({ ...x, ...p }));
   const save = () => {
     dispatch(dataActions.setWorkspace({ ...w, defaultRate: num(w.defaultRate), termsDays: num(w.termsDays), taxRate: num(w.taxRate), screenshotMinutes: num(w.screenshotMinutes) }));
@@ -123,7 +125,7 @@ export default function SettingsPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Settings"
-        sub="Your business, invoices and how time is counted."
+        sub={admin ? 'Your business, invoices and how time is counted.' : `Only owners and admins of ${account?.workspaceName ?? 'this workspace'} can change these. Your appearance and password are yours to change.`}
         actions={dirty && (
           <>
             <button type="button" className="btn" onClick={() => setW(s.workspace)}>Discard</button>
@@ -132,6 +134,7 @@ export default function SettingsPage() {
         )}
       />
       <div className="card px-5 py-7 md:px-8">
+        <fieldset disabled={!admin} className="contents">
         <Section title="Business" sub="Shown on every invoice you send.">
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Business name"><input className="input" value={w.businessName} onChange={(e) => set({ businessName: e.target.value })} /></Field>
@@ -215,6 +218,7 @@ export default function SettingsPage() {
           )}
         </Section>
 
+ </fieldset>
         <Section title="Appearance" sub="Follow your device, or always use light or dark.">
           <Segmented
             label="Theme"
@@ -237,6 +241,7 @@ export default function SettingsPage() {
           </Section>
         )}
 
+        <fieldset disabled={!admin} className="contents">
         <Section title="Locked months" sub="Locked months can’t be edited. Approving, waiving and invoicing still work.">
           <div className="flex flex-wrap items-center gap-3">
             <span className="flex items-center gap-2 text-[13.5px]">
@@ -253,6 +258,7 @@ export default function SettingsPage() {
           </div>
         </Section>
 
+        </fieldset>
         <Section title="Data" sub={gateway.snapshot ? 'Stored in this browser for now. The server version keeps it in your database.' : 'Stored on your server.'}>
           <div className="flex flex-wrap gap-2">
             <button
@@ -265,7 +271,7 @@ export default function SettingsPage() {
             >
               <Download /> Export backup
             </button>
-            <label className="btn cursor-pointer">
+            {admin && <label className="btn cursor-pointer">
               <Upload /> Import backup
               <input
                 type="file"
@@ -300,7 +306,7 @@ export default function SettingsPage() {
                   });
                 }}
               />
-            </label>
+            </label>}
             {hasSample && (
               <button
                 type="button"

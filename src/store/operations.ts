@@ -5,6 +5,7 @@ import type { Client, CreditNote, DataState, Expense, ID, Invoice, ISODate, ISOM
 import { addDays, fmtH, money, monthLabel, num, round2, snap15, todayISO } from '@/lib/format';
 import { uid } from '@/lib/utils';
 import { toast } from '@/lib/toast';
+import { session } from '@/data/session';
 import {
   buildInvoiceLines, byDateAsc, clientIdOf, findClient, findProject, invoiceTotals, isLocked, nextInvoiceSeq, sumMinutes,
 } from '@/domain/billing';
@@ -55,7 +56,7 @@ export const createTask =
       link: (i.link ?? '').trim(),
       minutes: snap15(i.minutes, s.workspace.rounding),
       status: statusForNew(s, i.projectId),
-      by: i.by || s.workspace.ownerName || '',
+      by: i.by || session.account()?.name || s.workspace.ownerName || '',
       invoiceId: null,
       createdAt: Date.now(),
     };
