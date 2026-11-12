@@ -7,6 +7,8 @@ import { Confirm, useModal } from '@/components/ui/Modal';
 import { useAppDispatch, useData } from '@/store';
 import { patch } from '@/store/dataSlice';
 import { markUnpaid, removePayment, voidInvoice } from '@/store/operations';
+import { invoiceApi } from '@/data/invoiceApi';
+import { gateway } from '@/data/gateway';
 import { CreditDialog, PaymentDialog, SendDialog, saveInvoiceHtml } from '@/features/invoices/InvoiceDialogs';
 import { clientIdOf, invoiceStatus, invoiceTotals, sumMinutes } from '@/domain/billing';
 import { invoiceTimesheetCsv } from '@/domain/invoiceExport';
@@ -181,7 +183,10 @@ export default function InvoiceDetailPage() {
   const open = (node: (c: () => void) => ReactNode) => modal.open(node);
 
   const more: MenuItem[] = [
-    { label: 'Download invoice', icon: <Download />, onSelect: () => saveInvoiceHtml(s, inv) },
+    ...(gateway.kind === 'http'
+      ? [{ label: 'Download PDF', icon: <Download />, onSelect: () => void invoiceApi.downloadPdf(inv).catch((e: unknown) => toast.error(e instanceof Error ? e.message : String(e))) }]
+      : []),
+    { label: gateway.kind === 'http' ? 'Download HTML' : 'Download invoice', icon: <Download />, onSelect: () => saveInvoiceHtml(s, inv) },
     { label: 'Download timesheet CSV', icon: <FileText />, onSelect: () => downloadFile(`${inv.number} timesheet.csv`, invoiceTimesheetCsv(s, inv), 'text/csv') },
   ];
   if (st !== 'draft' && st !== 'void') more.push({ label: 'Resend', icon: <Send />, onSelect: () => open((c) => <SendDialog inv={inv} onClose={c} />) });

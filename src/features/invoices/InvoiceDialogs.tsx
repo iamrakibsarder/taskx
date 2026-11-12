@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { Copy, Download, Mail } from 'lucide-react';
+import { Copy, Download, LoaderCircle, Mail, Send } from 'lucide-react';
 import type { Invoice } from '@/types/domain';
 import { Dialog } from '@/components/ui/Modal';
 import { Field } from '@/components/ui';
-import { useAppDispatch, useData } from '@/store';
+import { scheduleResync, useAppDispatch, useData } from '@/store';
+import { invoiceApi, serverMail } from '@/data/invoiceApi';
+import { useAccount } from '@/data/session';
 import { addCreditNote, markSent, recordPayment } from '@/store/operations';
 import { invoiceTotals } from '@/domain/billing';
 import { invoiceEmail, invoiceHtml } from '@/domain/invoiceExport';
@@ -15,8 +17,8 @@ export const saveInvoiceHtml = (s: ReturnType<typeof useData>, inv: Invoice) =>
   downloadFile(`${inv.number} ${inv.client.name}.html`, invoiceHtml(s, inv), 'text/html');
 
 /**
- * Sending happens from the user's own mail app for now (mailto + attached HTML).
- * When the Rust API is connected, this becomes a real "send" with the PDF attached.
+ * With the API and email set up, the server sends it with the PDF attached and marks it
+ * sent. Otherwise: open it in your own mail app (mailto + the invoice file), then mark it sent.
  */
 export function SendDialog({ inv, onClose }: { inv: Invoice; onClose: () => void }) {
   const s = useData();
@@ -27,12 +29,32 @@ export function SendDialog({ inv, onClose }: { inv: Invoice; onClose: () => void
   const [body, setBody] = useState(draft.body);
   const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   const resend = inv.status !== 'draft';
+  const server = serverMail();
+  const account = useAccount();
+  const [copyMe, setCopyMe] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const replyTo = s.workspace.email || account?.email;
+
+  const sendNow = async () => {
+    if (!to.trim()) return toast.error('Add the client’s email.');
+    setBusy(true);
+    try {
+      await invoiceApi.send(inv.id, { to: to.trim(), subject, body, copyMe, sentAt: todayISO() });
+      toast(`${inv.number} emailed to ${to.trim()}`);
+      scheduleResync(0);
+      onClose();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+      setBusy(false);
+    }
+  };
   return (
     <Dialog
       wide
       title={resend ? `Resend ${inv.number}` : `Send ${inv.number}`}
       onClose={onClose}
       onSubmit={() => {
+        if (server) return void sendNow();
         if (!to.trim()) return toast.error('Add the client’s email.');
         dispatch(markSent(inv.id, to.trim()));
         onClose();
@@ -42,14 +64,33 @@ export function SendDialog({ inv, onClose }: { inv: Invoice; onClose: () => void
           <button type="button" className="btn mr-auto" onClick={() => (navigator.clipboard?.writeText(`${subject}\n\n${body}`), toast('Email copied'))}>
             <Copy /> Copy
           </button>
-          <button type="button" className="btn" onClick={() => saveInvoiceHtml(s, inv)}><Download /> Invoice file</button>
-          <a className="btn" href={mailto} onClick={() => saveInvoiceHtml(s, inv)}><Mail /> Open in mail</a>
-          <button type="submit" className="btn btn-primary">{resend ? 'Mark resent' : 'Mark as sent'}</button>
+          {server ? (
+            <>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => void invoiceApi.downloadPdf(inv).catch((e: unknown) => toast.error(e instanceof Error ? e.message : String(e)))}
+              >
+                <Download /> PDF
+              </button>
+              <button type="submit" className="btn btn-primary" disabled={busy || !to.trim()}>
+                {busy ? <LoaderCircle className="animate-spin" /> : <Send />} {resend ? 'Send again' : 'Send email'}
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" className="btn" onClick={() => saveInvoiceHtml(s, inv)}><Download /> Invoice file</button>
+              <a className="btn" href={mailto} onClick={() => saveInvoiceHtml(s, inv)}><Mail /> Open in mail</a>
+              <button type="submit" className="btn btn-primary">{resend ? 'Mark resent' : 'Mark as sent'}</button>
+            </>
+          )}
         </>
       }
     >
       <p className="rounded-lg bg-surface-2 px-3 py-2 text-[13px] text-muted">
-        Open it in your mail app, attach the invoice file, send, then mark it as sent here.
+        {server
+          ? `TaskX emails this with the invoice attached as a PDF${replyTo ? `. Replies go to ${replyTo}` : ''}.`
+          : 'Open it in your mail app, attach the invoice file, send, then mark it as sent here.'}
       </p>
       <Field label="To">
         <input type="email" className="input" value={to} onChange={(e) => setTo(e.target.value)} placeholder="client@company.com" />
@@ -60,6 +101,12 @@ export function SendDialog({ inv, onClose }: { inv: Invoice; onClose: () => void
       <Field label="Message">
         <textarea className="input text-[13.5px]" rows={10} value={body} onChange={(e) => setBody(e.target.value)} />
       </Field>
+      {server && account && (
+        <label className="flex items-center gap-2 text-[13px] text-ink-2">
+          <input type="checkbox" checked={copyMe} onChange={(e) => setCopyMe(e.target.checked)} className="size-4 accent-brand-600" />
+          Send me a copy ({account.email})
+        </label>
+      )}
     </Dialog>
   );
 }
